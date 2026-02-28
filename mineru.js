@@ -1791,8 +1791,7 @@ ZoteroMineru = {
 				image.marker,
 				attachmentKey,
 				image.mimeType,
-				image.fileName,
-				image.dataURI
+				image.fileName
 			);
 		}
 		for (let image of embeddedImages) {
@@ -1857,11 +1856,11 @@ ZoteroMineru = {
 		}
 	},
 
-	replaceImageMarkerWithAttachment(html, marker, attachmentKey, mimeType, fileName, fallbackDataURI = "") {
+	replaceImageMarkerWithAttachment(html, marker, attachmentKey, mimeType, fileName) {
 		if (!html || !marker || !attachmentKey) return html;
 		let escapedMarker = this.escapeRegExp(marker);
 		let ext = this.guessImageExtension(mimeType, fileName);
-		let src = fallbackDataURI || `attachments/${attachmentKey}.${ext}`;
+		let src = `attachments/${attachmentKey}.${ext}`;
 		let imgTagRegex = new RegExp(`<img([^>]*?)\\bsrc=(["'])${escapedMarker}\\2([^>]*)>`, "gi");
 		return html.replace(imgTagRegex, (_m, before, _quote, after) => {
 			let tagBody = `${before || ""} ${after || ""}`;
