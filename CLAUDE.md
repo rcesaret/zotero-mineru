@@ -174,9 +174,17 @@ Parent Item (论文条目)
 2. `collectTranslateTasks()` 查找 `#MinerU-Parse` 标签的附件，检查 `#MinerU-Translation` 附件去重
 3. 读取 `.md` 文件全文 → `splitMarkdownIntoChunks()` 按标题/段落分段
 4. 使用限流并发逐段调用 `callLLMForTranslation()`，默认并发 3，每段失败时先自动重试
-5. 自动重试耗尽后，等本轮所有段落跑完，再弹窗询问是否只重试失败段
-6. 所有段落成功后，按原分段顺序统一合成结果，再调用 `saveTranslationAsMarkdownAttachment()` 保存为 Markdown 附件
-7. 文件名格式：`Translation ({language}) - {sourceTitle}.md`，标签 `#MinerU-Translation`
+5. 单段请求超时统一按 `withTimeout(..., 180000, "LLM 翻译请求")` 处理，超时和普通失败都会在进度窗与最终弹窗中明确提示
+6. 自动重试耗尽后，等本轮所有段落跑完，再弹窗询问是否只重试失败段
+7. 所有段落成功后，按原分段顺序统一合成结果，再调用 `saveTranslationAsMarkdownAttachment()` 保存为 Markdown 附件
+8. 文件名格式：`Translation ({language}) - {sourceTitle}.md`，标签 `#MinerU-Translation`
+
+### 翻译图片链接策略
+
+- 翻译 Markdown 附件**不复制**原解析附件下的 `images/` 目录，避免重复存储
+- 保存翻译附件前，会将 Markdown / HTML 中的本地图片相对路径改写为指向源解析附件 storage 的相对路径
+- 典型形式：`images/foo.png` → `../<sourceAttachmentKey>/images/foo.png`
+- 这意味着翻译附件依赖原始 `#MinerU-Parse` 附件；如果源附件被删除，翻译附件中的图片也会失效
 
 ### 分段策略
 
@@ -222,6 +230,17 @@ preferences.xhtml 分两个区域：MinerU 设置 + LLM 设置，Grid 布局（1
 - **保存** — 保存所有偏好
 - **测试 MinerU 连接** — POST `/file-urls/batch` 验证 API 可用性
 - **测试 LLM 连接** — POST `/chat/completions` 验证 LLM 可用性（30s 超时）
+
+翻译相关设置项补充：
+- **翻译分段字符数** — 控制单个 chunk 的最大字符数
+- **翻译并发请求数** — 控制同一篇文档同时发出的翻译请求数
+- **翻译自动重试次数** — 控制单段翻译失败后的自动重试次数
+
+## 文档维护
+
+- 当菜单结构、设置项、核心流程、发布流程、存储策略或用户可见行为发生变化时，必须在同一次工作中同步更新 `CLAUDE.md`
+- 如果用户要求“顺手更新说明”“同步文档”“记录流程”，默认更新本文件，而不是只改 README 或只留在提交信息里
+- 发布前若本次改动改变了开发约定或使用方式，应先检查 `CLAUDE.md` 是否需要一起修改
 
 ## 编码约定
 
