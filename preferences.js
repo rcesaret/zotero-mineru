@@ -11,7 +11,10 @@ var ZoteroMineruPreferences = {
 		{ id: "mineru-note-title-prefix", pref: "noteTitlePrefix", type: "string" },
 		{ id: "mineru-llm-api-base-url", pref: "llmApiBaseURL", type: "string" },
 		{ id: "mineru-llm-api-key", pref: "llmApiKey", type: "string" },
-		{ id: "mineru-llm-model", pref: "llmModel", type: "string" }
+		{ id: "mineru-llm-model", pref: "llmModel", type: "string" },
+		{ id: "mineru-summary-language", pref: "summaryLanguage", type: "string" },
+		{ id: "mineru-translate-language", pref: "translateLanguage", type: "string" },
+		{ id: "mineru-translate-chunk-size", pref: "translateChunkSize", type: "int" }
 	],
 
 	$(id) {

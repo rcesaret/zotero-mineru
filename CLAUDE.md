@@ -66,6 +66,7 @@ bash build-xpi.sh
 两个菜单项有各自的 ID：
 - `CONTEXT_MENU_ID`（"zotero-mineru-parse-pdf"）— PDF 解析
 - `SUMMARY_MENU_ID`（"zotero-mineru-ai-summary"）— AI 总结
+- `TRANSLATE_MENU_ID`（"zotero-mineru-ai-translate"）— AI 翻译
 
 卸载时 `unregisterMenu(CONTEXT_MENU_ID)` 清理 MenuManager 注册。
 
@@ -84,6 +85,9 @@ bash build-xpi.sh
 | llmApiBaseURL | string | | LLM API 地址 |
 | llmApiKey | string | | LLM API Key（自动去 `Bearer ` 前缀） |
 | llmModel | string | | LLM 模型名称 |
+| summaryLanguage | string | `中文` | AI 总结输出语言 |
+| translateLanguage | string | `中文` | AI 翻译目标语言 |
+| translateChunkSize | int | 20000 | 翻译分段字符数（长文分段翻译） |
 
 `apiToken` 有 legacy `apiKey` 回退逻辑。
 
@@ -94,11 +98,13 @@ bash build-xpi.sh
 | `#MinerU-Parse` | Markdown 附件 | 标识由 MinerU 解析生成的 Markdown 附件（旧版为笔记） |
 | `#MinerU-Parsed` | 父条目 | 标识已完成解析的文献条目 |
 | `#MinerU-Summary` | 笔记 | 标识由 AI 总结生成的笔记 |
+| `#MinerU-Translation` | Markdown 附件 | 标识由 AI 翻译生成的 Markdown 附件 |
 
 ### 防重复机制
 
 - **解析**：`collectPDFTasks()` 检查父条目子附件或子笔记是否含 `#MinerU-Parse` 标签（兼容新旧格式），有则跳过
 - **总结**：`collectSummaryTasks()` 检查是否含 `#MinerU-Summary` 笔记，有则跳过
+- **翻译**：`collectTranslateTasks()` 检查是否含 `#MinerU-Translation` 附件，有则跳过
 - 用户删除对应附件/笔记或标签即可重新触发
 
 ## PDF 解析流程
@@ -127,6 +133,7 @@ Parent Item (论文条目)
 │           ├── fig2.png
 │           └── ...
 └── AI Summary (笔记, tagged #MinerU-Summary)
+└── Translation (中文) - xxx.md (stored attachment, tagged #MinerU-Translation)
 ```
 
 进度阶段：准备解析(5%) → 读取PDF(10%) → 申请上传(20%) → 上传(35%) → 等待解析(55%) → 下载结果(75%) → 提取Markdown(90%) → 提取完成(95%) → 保存Markdown(85%) → 完成(100%)
@@ -141,6 +148,22 @@ Parent Item (论文条目)
 4. 截断 60000 字符后 POST `{llmApiBaseURL}/chat/completions`，120 秒超时，temperature 0.3
 5. System prompt 要求结构化中文总结（背景/目的/方法/发现/结论）
 6. 保存为新笔记，标题 "AI Summary {parentTitle}"，标签 `#MinerU-Summary`
+
+## AI 翻译流程
+
+1. `getLLMSettings()` 校验 LLM 设置完整性，获取 `translateLanguage` 和 `translateChunkSize`
+2. `collectTranslateTasks()` 查找 `#MinerU-Parse` 标签的附件，检查 `#MinerU-Translation` 附件去重
+3. 读取 `.md` 文件全文 → `splitMarkdownIntoChunks()` 按标题/段落分段
+4. 逐段调用 `callLLMForTranslation()`，180 秒超时，system prompt 要求保持 Markdown 格式
+5. 拼接翻译结果 → `saveTranslationAsMarkdownAttachment()` 保存为 Markdown 附件
+6. 文件名格式：`Translation ({language}) - {sourceTitle}.md`，标签 `#MinerU-Translation`
+
+### 分段策略
+
+1. 按 `# ` / `## ` 标题行分割
+2. 若单段 > chunkSize，按 `\n\n` 段落再分
+3. 若单段落仍 > chunkSize，按行硬切
+4. 每段独立发送 LLM，带"第 X/N 段"上下文提示
 
 ## Markdown→HTML 转换
 

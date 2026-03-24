@@ -1,4 +1,6 @@
 zotero-mineru-menu-parse-pdf =
     .label = 使用 MinerU 解析 PDF 并保存为 Markdown
 zotero-mineru-menu-ai-summary =
-    .label = 使用 AI 总结文献 (中文)
+    .label = 使用 AI 总结文献
+zotero-mineru-menu-ai-translate =
+    .label = 使用 AI 翻译文献

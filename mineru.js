@@ -9,6 +9,7 @@ ZoteroMineru = {
 	PREF_BRANCH: "extensions.zotero-mineru.",
 	CONTEXT_MENU_ID: "zotero-mineru-parse-pdf",
 	SUMMARY_MENU_ID: "zotero-mineru-ai-summary",
+	TRANSLATE_MENU_ID: "zotero-mineru-ai-translate",
 	
 	init({ id, version, rootURI }) {
 		if (this.initialized) return;
@@ -69,7 +70,7 @@ ZoteroMineru = {
 					},
 					{
 						menuType: "menuitem",
-						label: "使用 AI 总结文献 (中文)",
+						label: "使用 AI 总结文献",
 						l10nID: "zotero-mineru-menu-ai-summary",
 						icon: iconURL,
 						iconURL,
@@ -89,6 +90,31 @@ ZoteroMineru = {
 								this.log(`Summary command failed: ${e}`);
 								Zotero.logError(e);
 								this.showAlert(window, "MinerU", `AI 总结失败: ${e.message || e}`);
+							});
+						}
+					},
+					{
+						menuType: "menuitem",
+						label: "使用 AI 翻译文献",
+						l10nID: "zotero-mineru-menu-ai-translate",
+						icon: iconURL,
+						iconURL,
+						image: iconURL,
+						onShowing: (_event, context) => {
+							if (typeof context?.setEnabled === "function") {
+								let selectedItems = Array.isArray(context?.items) ? context.items : [];
+								context.setEnabled(this.collectTranslateTasks(selectedItems).length > 0);
+							}
+						},
+						onCommand: (_event, context) => {
+							let window = context?.menuElem?.ownerGlobal
+								|| Zotero.getMainWindows?.()?.[0]
+								|| null;
+							let selectedItems = Array.isArray(context?.items) ? context.items : null;
+							this.handleTranslateCommand({ window, selectedItems }).catch((e) => {
+								this.log(`Translate command failed: ${e}`);
+								Zotero.logError(e);
+								this.showAlert(window, "MinerU", `AI 翻译失败: ${e.message || e}`);
 							});
 						}
 					}
@@ -137,7 +163,7 @@ ZoteroMineru = {
 
 		let summaryItem = doc.createXULElement("menuitem");
 		summaryItem.id = this.SUMMARY_MENU_ID;
-		summaryItem.setAttribute("label", "使用 AI 总结文献 (中文)");
+		summaryItem.setAttribute("label", "使用 AI 总结文献");
 		summaryItem.setAttribute("class", "menuitem-iconic");
 		summaryItem.setAttribute("image", this.getMenuIconURL());
 		summaryItem.style.listStyleImage = `url("${this.getMenuIconURL()}")`;
@@ -150,12 +176,29 @@ ZoteroMineru = {
 		});
 		popup.appendChild(summaryItem);
 
+		let translateItem = doc.createXULElement("menuitem");
+		translateItem.id = this.TRANSLATE_MENU_ID;
+		translateItem.setAttribute("label", "使用 AI 翻译文献");
+		translateItem.setAttribute("class", "menuitem-iconic");
+		translateItem.setAttribute("image", this.getMenuIconURL());
+		translateItem.style.listStyleImage = `url("${this.getMenuIconURL()}")`;
+		translateItem.addEventListener("command", () => {
+			this.handleTranslateCommand({ window }).catch((e) => {
+				this.log(`Translate command failed: ${e}`);
+				Zotero.logError(e);
+				this.showAlert(window, "MinerU", `AI 翻译失败: ${e.message || e}`);
+			});
+		});
+		popup.appendChild(translateItem);
+
 		let onPopupShowing = () => {
 			let selectedItems = window.ZoteroPane?.getSelectedItems?.() || [];
 			let tasks = this.collectPDFTasks(selectedItems);
 			menuitem.disabled = !tasks.length;
 			let summaryTasks = this.collectSummaryTasks(selectedItems);
 			summaryItem.disabled = !summaryTasks.length;
+			let translateTasks = this.collectTranslateTasks(selectedItems);
+			translateItem.disabled = !translateTasks.length;
 		};
 		popup.addEventListener("popupshowing", onPopupShowing);
 		this.popupListeners.set(window, { popup, onPopupShowing });
@@ -186,6 +229,7 @@ ZoteroMineru = {
 		let doc = window.document;
 		doc.getElementById(this.CONTEXT_MENU_ID)?.remove();
 		doc.getElementById(this.SUMMARY_MENU_ID)?.remove();
+		doc.getElementById(this.TRANSLATE_MENU_ID)?.remove();
 		let listenerData = this.popupListeners.get(window);
 		if (listenerData) {
 			listenerData.popup.removeEventListener("popupshowing", listenerData.onPopupShowing);
@@ -2151,7 +2195,11 @@ ZoteroMineru = {
 		let apiKey = (Zotero.Prefs.get(this.PREF_BRANCH + "llmApiKey", true) || "").trim();
 		apiKey = apiKey.replace(/^Bearer\s+/i, "");
 		let model = (Zotero.Prefs.get(this.PREF_BRANCH + "llmModel", true) || "").trim();
-		return { apiBaseURL, apiKey, model };
+		let summaryLanguage = (Zotero.Prefs.get(this.PREF_BRANCH + "summaryLanguage", true) || "中文").trim();
+		let translateLanguage = (Zotero.Prefs.get(this.PREF_BRANCH + "translateLanguage", true) || "中文").trim();
+		let translateChunkSize = Zotero.Prefs.get(this.PREF_BRANCH + "translateChunkSize", true);
+		if (!Number.isFinite(translateChunkSize) || translateChunkSize < 5000) translateChunkSize = 20000;
+		return { apiBaseURL, apiKey, model, summaryLanguage, translateLanguage, translateChunkSize };
 	},
 
 	collectSummaryTasks(selectedItems) {
@@ -2266,7 +2314,7 @@ ZoteroMineru = {
 				if (typeof itemProgress.setText === "function") {
 					itemProgress.setText(`${title}（调用 LLM）`);
 				}
-				let summary = await this.callLLMForSummary(plainText, llmSettings);
+				let summary = await this.callLLMForSummary(plainText, llmSettings, llmSettings.summaryLanguage);
 
 				if (typeof itemProgress.setText === "function") {
 					itemProgress.setText(`${title}（保存笔记）`);
@@ -2299,9 +2347,12 @@ ZoteroMineru = {
 		}
 	},
 
-	async callLLMForSummary(plainText, llmSettings) {
+	async callLLMForSummary(plainText, llmSettings, language) {
 		let url = `${llmSettings.apiBaseURL}/chat/completions`;
-		let systemPrompt = `你是一位学术研究助手。请根据用户提供的论文内容，用中文撰写一份结构化的学术总结。总结应包含以下几个部分：
+		language = language || "中文";
+		let systemPrompt
+		if (language === "中文") {
+			systemPrompt = `你是一位学术研究助手。请根据用户提供的论文内容，用中文撰写一份结构化的学术总结。总结应包含以下几个部分：
 
 ## 研究背景
 简要介绍研究领域和背景。
@@ -2319,12 +2370,36 @@ ZoteroMineru = {
 总结研究的主要结论及其学术或实际意义。
 
 请确保总结准确、简洁，忠实于原文内容，不要添加原文中没有的信息。`;
+		} else {
+			systemPrompt = `You are an academic research assistant. Based on the paper content provided by the user, write a structured academic summary in ${language}. The summary should include the following sections:
+
+## Background
+Briefly introduce the research field and background.
+
+## Objectives
+Clearly state the problem or goals of this research.
+
+## Methods
+Outline the main methods and technical approach.
+
+## Key Findings
+List the key research results and findings.
+
+## Conclusions and Significance
+Summarize the main conclusions and their academic or practical significance.
+
+Ensure the summary is accurate, concise, and faithful to the original content. Do not add information not present in the original text. Write entirely in ${language}.`;
+		}
+
+		let userMessage = language === "中文"
+			? `请总结以下论文内容：\n\n${plainText}`
+			: `Please summarize the following paper:\n\n${plainText}`;
 
 		let payload = {
 			model: llmSettings.model,
 			messages: [
 				{ role: "system", content: systemPrompt },
-				{ role: "user", content: `请总结以下论文内容：\n\n${plainText}` }
+				{ role: "user", content: userMessage }
 			],
 			temperature: 0.3
 		};
@@ -2368,5 +2443,278 @@ ZoteroMineru = {
 		this.trySetNoteTitle(note, noteTitle);
 		note.addTag("#MinerU-Summary", 0);
 		await note.saveTx();
+	},
+
+	// ==================== Translation Feature ====================
+
+	collectTranslateTasks(selectedItems) {
+		let tasks = []
+		let seenParentIDs = new Set()
+		for (let item of selectedItems) {
+			let parentItem = null
+			if (item.isNote()) {
+				let pid = item.parentItemID
+				parentItem = pid ? Zotero.Items.get(pid) : null
+			} else if (item.isRegularItem()) {
+				parentItem = item
+			} else if (item.isAttachment()) {
+				let pid = item.parentItemID
+				parentItem = pid ? Zotero.Items.get(pid) : null
+			}
+			if (!parentItem || !parentItem.isRegularItem()) continue
+			if (seenParentIDs.has(parentItem.id)) continue
+			seenParentIDs.add(parentItem.id)
+
+			let mineruSource = null
+
+			// Find #MinerU-Parse attachment (Markdown file)
+			let attachmentIDs = parentItem.getAttachments()
+			for (let attachmentID of attachmentIDs) {
+				let attachmentItem = Zotero.Items.get(attachmentID)
+				if (!attachmentItem) continue
+				let tags = attachmentItem.getTags()
+				if (tags.some((t) => t.tag === "#MinerU-Parse")) {
+					mineruSource = attachmentItem
+					break
+				}
+			}
+
+			if (mineruSource) {
+				let hasTranslation = this.parentHasAttachmentWithTag(parentItem, "#MinerU-Translation")
+				if (!hasTranslation) {
+					tasks.push({ parentItem, mineruSource })
+				}
+			}
+		}
+		return tasks
+	},
+
+	async handleTranslateCommand({ window = null, selectedItems = null } = {}) {
+		let llmSettings = this.getLLMSettings()
+		if (!llmSettings.apiBaseURL || !llmSettings.apiKey || !llmSettings.model) {
+			this.showAlert(window, "MinerU", "请先在设置中填写完整的 LLM API 信息（Base URL、API Key、模型名称）。")
+			return
+		}
+
+		let items = selectedItems
+			|| window?.ZoteroPane?.getSelectedItems?.()
+			|| []
+		let tasks = this.collectTranslateTasks(items)
+		if (!tasks.length) {
+			this.showAlert(window, "MinerU", "当前选择的条目没有可翻译的 MinerU 解析结果，请先使用 MinerU 解析 PDF。\n（已有翻译结果的条目会被跳过）")
+			return
+		}
+
+		let language = llmSettings.translateLanguage || "中文"
+		let chunkSize = llmSettings.translateChunkSize || 20000
+
+		let progress = new Zotero.ProgressWindow({ closeOnClick: true })
+		progress.changeHeadline(`AI 文献翻译 → ${language}`)
+		progress.show()
+
+		let successes = 0
+		let failures = []
+
+		for (let task of tasks) {
+			let title = task.parentItem.getField("title") || "未知文献"
+			let itemProgress = new progress.ItemProgress(
+				"chrome://zotero/skin/treeitem-note.png",
+				title
+			)
+			try {
+				if (typeof itemProgress.setText === "function") {
+					itemProgress.setText(`${title}（提取文本）`)
+				}
+				let filePath = await task.mineruSource.getFilePath()
+				if (!filePath) throw new Error("MinerU Markdown 附件文件不存在")
+				let fileBytes = await IOUtils.read(filePath)
+				let fullText = new TextDecoder("utf-8").decode(fileBytes)
+				if (!fullText.trim()) {
+					throw new Error("MinerU 解析内容为空")
+				}
+
+				// Split into chunks for translation
+				let chunks = this.splitMarkdownIntoChunks(fullText, chunkSize)
+				let translatedParts = []
+
+				for (let i = 0; i < chunks.length; i++) {
+					if (typeof itemProgress.setText === "function") {
+						itemProgress.setText(`${title}（翻译 ${i + 1}/${chunks.length}）`)
+					}
+					let translated = await this.callLLMForTranslation(chunks[i], language, llmSettings, i + 1, chunks.length)
+					translatedParts.push(translated)
+				}
+
+				let translatedText = translatedParts.join("\n\n")
+
+				if (typeof itemProgress.setText === "function") {
+					itemProgress.setText(`${title}（保存附件）`)
+				}
+				await this.saveTranslationAsMarkdownAttachment({
+					parentItem: task.parentItem,
+					sourceAttachment: task.mineruSource,
+					translatedText,
+					language
+				})
+
+				if (typeof itemProgress.setText === "function") {
+					itemProgress.setText(`${title}（完成）`)
+				}
+				itemProgress.setProgress(100)
+				successes++
+			} catch (e) {
+				if (typeof itemProgress.setText === "function") {
+					itemProgress.setText(`${title}（失败）`)
+				}
+				itemProgress.setError()
+				failures.push(`${title}: ${e.message || e}`)
+				Zotero.logError(e)
+			}
+		}
+
+		progress.addDescription(`完成 ${successes}/${tasks.length}`)
+		progress.startCloseTimer(5000)
+
+		if (failures.length) {
+			this.showAlert(window, "AI 翻译部分失败", failures.slice(0, 10).join("\n"))
+		}
+	},
+
+	splitMarkdownIntoChunks(text, chunkSize) {
+		if (text.length <= chunkSize) return [text]
+
+		let chunks = []
+		// Split by headings first (# or ##)
+		let sections = text.split(/(?=^#{1,2}\s)/m)
+
+		let currentChunk = ""
+		for (let section of sections) {
+			if (!section) continue
+			if (currentChunk.length + section.length <= chunkSize) {
+				currentChunk += section
+			} else {
+				if (currentChunk) chunks.push(currentChunk)
+				// If a single section exceeds chunkSize, split by paragraphs
+				if (section.length > chunkSize) {
+					let paragraphs = section.split(/\n\n+/)
+					currentChunk = ""
+					for (let para of paragraphs) {
+						if (currentChunk.length + para.length + 2 <= chunkSize) {
+							currentChunk += (currentChunk ? "\n\n" : "") + para
+						} else {
+							if (currentChunk) chunks.push(currentChunk)
+							// If a single paragraph still exceeds chunkSize, hard split by lines
+							if (para.length > chunkSize) {
+								let lines = para.split("\n")
+								currentChunk = ""
+								for (let line of lines) {
+									if (currentChunk.length + line.length + 1 <= chunkSize) {
+										currentChunk += (currentChunk ? "\n" : "") + line
+									} else {
+										if (currentChunk) chunks.push(currentChunk)
+										currentChunk = line
+									}
+								}
+							} else {
+								currentChunk = para
+							}
+						}
+					}
+				} else {
+					currentChunk = section
+				}
+			}
+		}
+		if (currentChunk) chunks.push(currentChunk)
+
+		return chunks
+	},
+
+	async callLLMForTranslation(text, language, llmSettings, chunkIndex, totalChunks) {
+		let url = `${llmSettings.apiBaseURL}/chat/completions`
+
+		let chunkHint = totalChunks > 1
+			? `\n\nNote: This is part ${chunkIndex} of ${totalChunks}. Translate only this part, maintaining continuity.`
+			: ""
+
+		let systemPrompt = `You are a professional academic translator. Translate the following Markdown content into ${language}.
+
+Rules:
+- Preserve all Markdown formatting (headings, bold, italic, lists, code blocks, etc.)
+- Preserve all mathematical formulas ($...$ and $$...$$) without translation
+- Preserve all table structures
+- Preserve all image references and links
+- Translate only the natural language text
+- Do not add explanations or notes
+- Output only the translated Markdown content${chunkHint}`
+
+		let payload = {
+			model: llmSettings.model,
+			messages: [
+				{ role: "system", content: systemPrompt },
+				{ role: "user", content: text }
+			],
+			temperature: 0.3
+		}
+
+		let doFetch = async () => {
+			let response = await fetch(url, {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					"Authorization": `Bearer ${llmSettings.apiKey}`
+				},
+				body: JSON.stringify(payload)
+			})
+
+			if (!response.ok) {
+				let errText = await response.text()
+				throw new Error(`LLM API 请求失败 ${response.status}: ${errText.slice(0, 500)}`)
+			}
+
+			let result = await response.json()
+			let content = result?.choices?.[0]?.message?.content
+			if (!content || !content.trim()) {
+				throw new Error("LLM 返回内容为空")
+			}
+			return content.trim()
+		}
+
+		return await this.withTimeout(doFetch, 180000, "LLM 翻译请求")
+	},
+
+	async saveTranslationAsMarkdownAttachment({ parentItem, sourceAttachment, translatedText, language }) {
+		let sourceTitle = sourceAttachment.getField("title")
+			|| this.fileNameFromPath(sourceAttachment.getFilePath() || "document")
+		let mdFileName = this.sanitizeFileName(`Translation (${language}) - ${sourceTitle}`)
+		if (!mdFileName.endsWith(".md")) mdFileName += ".md"
+
+		// Write .md to temp dir
+		let tempDir = PathUtils.join(
+			PathUtils.tempDir,
+			`zotero-mineru-translate-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+		)
+		await IOUtils.makeDirectory(tempDir, { createAncestors: true })
+		let mdTempPath = PathUtils.join(tempDir, mdFileName)
+		await IOUtils.writeUTF8(mdTempPath, translatedText)
+
+		try {
+			let mdAttachment = await Zotero.Attachments.importFromFile({
+				file: mdTempPath,
+				libraryID: parentItem.libraryID,
+				parentItemID: parentItem.id,
+				contentType: "text/markdown",
+				charset: "utf-8"
+			})
+
+			mdAttachment.addTag("#MinerU-Translation", 0)
+			await mdAttachment.saveTx()
+
+			this.log(`翻译附件已保存: ${mdFileName}`)
+		}
+		finally {
+			await IOUtils.remove(mdTempPath).catch(() => {})
+			await IOUtils.remove(tempDir, { recursive: true }).catch(() => {})
+		}
 	}
 };

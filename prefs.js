@@ -7,3 +7,6 @@ pref("extensions.zotero-mineru.noteTitlePrefix", "MinerU Parse");
 pref("extensions.zotero-mineru.llmApiBaseURL", "");
 pref("extensions.zotero-mineru.llmApiKey", "");
 pref("extensions.zotero-mineru.llmModel", "");
+pref("extensions.zotero-mineru.summaryLanguage", "中文");
+pref("extensions.zotero-mineru.translateLanguage", "中文");
+pref("extensions.zotero-mineru.translateChunkSize", 20000);
