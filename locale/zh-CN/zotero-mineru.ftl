@@ -1,3 +1,5 @@
+zotero-mineru-menu-root =
+    .label = MinerU
 zotero-mineru-menu-parse-pdf =
     .label = 使用 MinerU 解析 PDF 并保存为 Markdown
 zotero-mineru-menu-ai-summary =

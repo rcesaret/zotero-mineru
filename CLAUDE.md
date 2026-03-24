@@ -76,15 +76,16 @@ bash build-xpi.sh
 
 ### 菜单注册（双轨制）
 
-- **Zotero 8 MenuManager**（主路径）：`Zotero.MenuManager.registerMenu()` 注册 `CONTEXT_MENU_ID`，menus 数组包含解析和总结菜单项
-- **XUL 回退**（旧版兼容）：`createXULElement("menuitem")` + `popupshowing` 事件
+- **Zotero 8 MenuManager**（主路径）：`Zotero.MenuManager.registerMenu()` 注册 `ROOT_MENU_ID`，父菜单下包含解析、总结、翻译三个子项
+- **XUL 回退**（旧版兼容）：`createXULElement("menu")` + `menupopup` + `popupshowing` 事件
 
-两个菜单项有各自的 ID：
+上下文菜单现在是一个父菜单 + 三个子菜单项：
+- `ROOT_MENU_ID`（"zotero-mineru-menu"）— 父菜单
 - `CONTEXT_MENU_ID`（"zotero-mineru-parse-pdf"）— PDF 解析
 - `SUMMARY_MENU_ID`（"zotero-mineru-ai-summary"）— AI 总结
 - `TRANSLATE_MENU_ID`（"zotero-mineru-ai-translate"）— AI 翻译
 
-卸载时 `unregisterMenu(CONTEXT_MENU_ID)` 清理 MenuManager 注册。
+卸载时 `unregisterMenu(ROOT_MENU_ID)` 清理 MenuManager 注册。
 
 ### 偏好分支
 

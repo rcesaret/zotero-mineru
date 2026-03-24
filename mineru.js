@@ -7,6 +7,7 @@ ZoteroMineru = {
 	popupListeners: new WeakMap(),
 	
 	PREF_BRANCH: "extensions.zotero-mineru.",
+	ROOT_MENU_ID: "zotero-mineru-menu",
 	CONTEXT_MENU_ID: "zotero-mineru-parse-pdf",
 	SUMMARY_MENU_ID: "zotero-mineru-ai-summary",
 	TRANSLATE_MENU_ID: "zotero-mineru-ai-translate",
@@ -34,89 +35,81 @@ ZoteroMineru = {
 		return !!Zotero.MenuManager?.registerMenu;
 	},
 
+	getContextMenuDefinitions() {
+		return [
+			{
+				id: this.CONTEXT_MENU_ID,
+				label: "使用 MinerU 解析 PDF 并保存为 Markdown",
+				l10nID: "zotero-mineru-menu-parse-pdf",
+				getTasks: (selectedItems) => this.collectPDFTasks(selectedItems),
+				run: ({ window, selectedItems }) => this.handleParseCommand({ window, selectedItems }),
+				errorPrefix: "执行失败"
+			},
+			{
+				id: this.SUMMARY_MENU_ID,
+				label: "使用 AI 总结文献",
+				l10nID: "zotero-mineru-menu-ai-summary",
+				getTasks: (selectedItems) => this.collectSummaryTasks(selectedItems),
+				run: ({ window, selectedItems }) => this.handleSummaryCommand({ window, selectedItems }),
+				errorPrefix: "AI 总结失败"
+			},
+			{
+				id: this.TRANSLATE_MENU_ID,
+				label: "使用 AI 翻译文献",
+				l10nID: "zotero-mineru-menu-ai-translate",
+				getTasks: (selectedItems) => this.collectTranslateTasks(selectedItems),
+				run: ({ window, selectedItems }) => this.handleTranslateCommand({ window, selectedItems }),
+				errorPrefix: "AI 翻译失败"
+			}
+		];
+	},
+
+	runContextMenuCommand(definition, { window, selectedItems }) {
+		definition.run({ window, selectedItems }).catch((e) => {
+			this.log(`${definition.id} command failed: ${e}`);
+			Zotero.logError(e);
+			this.showAlert(window, "MinerU", `${definition.errorPrefix}: ${e.message || e}`);
+		});
+	},
+
 	registerMenuForZotero8() {
 		if (!this.supportsMenuManager() || this.menuRegistered) return false;
 		try {
 			let iconURL = this.getMenuIconURL();
+			let menuDefinitions = this.getContextMenuDefinitions();
 			Zotero.MenuManager.registerMenu({
-				menuID: this.CONTEXT_MENU_ID,
+				menuID: this.ROOT_MENU_ID,
 				pluginID: this.id,
 				target: "main/library/item",
 				menus: [
 					{
-						menuType: "menuitem",
-						label: "使用 MinerU 解析 PDF 并保存为 Markdown",
-						l10nID: "zotero-mineru-menu-parse-pdf",
+						menuType: "submenu",
+						label: "MinerU",
+						l10nID: "zotero-mineru-menu-root",
 						icon: iconURL,
 						iconURL,
 						image: iconURL,
-						onShowing: (_event, context) => {
-							if (typeof context?.setEnabled === "function") {
-								let selectedItems = Array.isArray(context?.items) ? context.items : [];
-								context.setEnabled(this.collectPDFTasks(selectedItems).length > 0);
+						menus: menuDefinitions.map((definition) => ({
+							menuType: "menuitem",
+							label: definition.label,
+							l10nID: definition.l10nID,
+							icon: iconURL,
+							iconURL,
+							image: iconURL,
+							onShowing: (_event, context) => {
+								if (typeof context?.setEnabled === "function") {
+									let selectedItems = Array.isArray(context?.items) ? context.items : [];
+									context.setEnabled(definition.getTasks(selectedItems).length > 0);
+								}
+							},
+							onCommand: (_event, context) => {
+								let window = context?.menuElem?.ownerGlobal
+									|| Zotero.getMainWindows?.()?.[0]
+									|| null;
+								let selectedItems = Array.isArray(context?.items) ? context.items : null;
+								this.runContextMenuCommand(definition, { window, selectedItems });
 							}
-						},
-						onCommand: (_event, context) => {
-							let window = context?.menuElem?.ownerGlobal
-								|| Zotero.getMainWindows?.()?.[0]
-								|| null;
-							let selectedItems = Array.isArray(context?.items) ? context.items : null;
-							this.handleParseCommand({ window, selectedItems }).catch((e) => {
-								this.log(`Parse command failed: ${e}`);
-								Zotero.logError(e);
-								this.showAlert(window, "MinerU", `执行失败: ${e.message || e}`);
-							});
-						}
-					},
-					{
-						menuType: "menuitem",
-						label: "使用 AI 总结文献",
-						l10nID: "zotero-mineru-menu-ai-summary",
-						icon: iconURL,
-						iconURL,
-						image: iconURL,
-						onShowing: (_event, context) => {
-							if (typeof context?.setEnabled === "function") {
-								let selectedItems = Array.isArray(context?.items) ? context.items : [];
-								context.setEnabled(this.collectSummaryTasks(selectedItems).length > 0);
-							}
-						},
-						onCommand: (_event, context) => {
-							let window = context?.menuElem?.ownerGlobal
-								|| Zotero.getMainWindows?.()?.[0]
-								|| null;
-							let selectedItems = Array.isArray(context?.items) ? context.items : null;
-							this.handleSummaryCommand({ window, selectedItems }).catch((e) => {
-								this.log(`Summary command failed: ${e}`);
-								Zotero.logError(e);
-								this.showAlert(window, "MinerU", `AI 总结失败: ${e.message || e}`);
-							});
-						}
-					},
-					{
-						menuType: "menuitem",
-						label: "使用 AI 翻译文献",
-						l10nID: "zotero-mineru-menu-ai-translate",
-						icon: iconURL,
-						iconURL,
-						image: iconURL,
-						onShowing: (_event, context) => {
-							if (typeof context?.setEnabled === "function") {
-								let selectedItems = Array.isArray(context?.items) ? context.items : [];
-								context.setEnabled(this.collectTranslateTasks(selectedItems).length > 0);
-							}
-						},
-						onCommand: (_event, context) => {
-							let window = context?.menuElem?.ownerGlobal
-								|| Zotero.getMainWindows?.()?.[0]
-								|| null;
-							let selectedItems = Array.isArray(context?.items) ? context.items : null;
-							this.handleTranslateCommand({ window, selectedItems }).catch((e) => {
-								this.log(`Translate command failed: ${e}`);
-								Zotero.logError(e);
-								this.showAlert(window, "MinerU", `AI 翻译失败: ${e.message || e}`);
-							});
-						}
+						}))
 					}
 				]
 			});
@@ -144,61 +137,43 @@ ZoteroMineru = {
 			this.log("Item context menu not found in this window");
 			return;
 		}
-		if (doc.getElementById(this.CONTEXT_MENU_ID)) return;
+		if (doc.getElementById(this.ROOT_MENU_ID)) return;
+		let iconURL = this.getMenuIconURL();
+		let menuDefinitions = this.getContextMenuDefinitions();
 		
-		let menuitem = doc.createXULElement("menuitem");
-		menuitem.id = this.CONTEXT_MENU_ID;
-		menuitem.setAttribute("label", "使用 MinerU 解析 PDF 并保存为 Markdown");
-		menuitem.setAttribute("class", "menuitem-iconic");
-		menuitem.setAttribute("image", this.getMenuIconURL());
-		menuitem.style.listStyleImage = `url("${this.getMenuIconURL()}")`;
-		menuitem.addEventListener("command", () => {
-			this.handleParseCommand({ window }).catch((e) => {
-				this.log(`Parse command failed: ${e}`);
-				Zotero.logError(e);
-				this.showAlert(window, "MinerU", `执行失败: ${e.message || e}`);
+		let rootMenu = doc.createXULElement("menu");
+		rootMenu.id = this.ROOT_MENU_ID;
+		rootMenu.setAttribute("label", "MinerU");
+		rootMenu.setAttribute("class", "menu-iconic");
+		rootMenu.setAttribute("image", iconURL);
+		rootMenu.style.listStyleImage = `url("${iconURL}")`;
+		let subPopup = doc.createXULElement("menupopup");
+		rootMenu.appendChild(subPopup);
+		let menuItems = [];
+		for (let definition of menuDefinitions) {
+			let menuitem = doc.createXULElement("menuitem");
+			menuitem.id = definition.id;
+			menuitem.setAttribute("label", definition.label);
+			menuitem.setAttribute("class", "menuitem-iconic");
+			menuitem.setAttribute("image", iconURL);
+			menuitem.style.listStyleImage = `url("${iconURL}")`;
+			menuitem.addEventListener("command", () => {
+				this.runContextMenuCommand(definition, { window, selectedItems: null });
 			});
-		});
-		popup.appendChild(menuitem);
-
-		let summaryItem = doc.createXULElement("menuitem");
-		summaryItem.id = this.SUMMARY_MENU_ID;
-		summaryItem.setAttribute("label", "使用 AI 总结文献");
-		summaryItem.setAttribute("class", "menuitem-iconic");
-		summaryItem.setAttribute("image", this.getMenuIconURL());
-		summaryItem.style.listStyleImage = `url("${this.getMenuIconURL()}")`;
-		summaryItem.addEventListener("command", () => {
-			this.handleSummaryCommand({ window }).catch((e) => {
-				this.log(`Summary command failed: ${e}`);
-				Zotero.logError(e);
-				this.showAlert(window, "MinerU", `AI 总结失败: ${e.message || e}`);
-			});
-		});
-		popup.appendChild(summaryItem);
-
-		let translateItem = doc.createXULElement("menuitem");
-		translateItem.id = this.TRANSLATE_MENU_ID;
-		translateItem.setAttribute("label", "使用 AI 翻译文献");
-		translateItem.setAttribute("class", "menuitem-iconic");
-		translateItem.setAttribute("image", this.getMenuIconURL());
-		translateItem.style.listStyleImage = `url("${this.getMenuIconURL()}")`;
-		translateItem.addEventListener("command", () => {
-			this.handleTranslateCommand({ window }).catch((e) => {
-				this.log(`Translate command failed: ${e}`);
-				Zotero.logError(e);
-				this.showAlert(window, "MinerU", `AI 翻译失败: ${e.message || e}`);
-			});
-		});
-		popup.appendChild(translateItem);
+			subPopup.appendChild(menuitem);
+			menuItems.push({ definition, menuitem });
+		}
+		popup.appendChild(rootMenu);
 
 		let onPopupShowing = () => {
 			let selectedItems = window.ZoteroPane?.getSelectedItems?.() || [];
-			let tasks = this.collectPDFTasks(selectedItems);
-			menuitem.disabled = !tasks.length;
-			let summaryTasks = this.collectSummaryTasks(selectedItems);
-			summaryItem.disabled = !summaryTasks.length;
-			let translateTasks = this.collectTranslateTasks(selectedItems);
-			translateItem.disabled = !translateTasks.length;
+			let hasEnabledChild = false;
+			for (let { definition, menuitem } of menuItems) {
+				let hasTasks = definition.getTasks(selectedItems).length > 0;
+				menuitem.disabled = !hasTasks;
+				hasEnabledChild ||= hasTasks;
+			}
+			rootMenu.disabled = !hasEnabledChild;
 		};
 		popup.addEventListener("popupshowing", onPopupShowing);
 		this.popupListeners.set(window, { popup, onPopupShowing });
@@ -227,6 +202,7 @@ ZoteroMineru = {
 			catch (_e) {}
 		}
 		let doc = window.document;
+		doc.getElementById(this.ROOT_MENU_ID)?.remove();
 		doc.getElementById(this.CONTEXT_MENU_ID)?.remove();
 		doc.getElementById(this.SUMMARY_MENU_ID)?.remove();
 		doc.getElementById(this.TRANSLATE_MENU_ID)?.remove();
@@ -240,7 +216,7 @@ ZoteroMineru = {
 	removeFromAllWindows() {
 		if (this.supportsMenuManager() && this.menuRegistered) {
 			try {
-				Zotero.MenuManager.unregisterMenu(this.CONTEXT_MENU_ID);
+				Zotero.MenuManager.unregisterMenu(this.ROOT_MENU_ID);
 			}
 			catch (e) {
 				this.log(`Failed to unregister menu: ${e}`);
