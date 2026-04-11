@@ -2,7 +2,7 @@
 
 [English README](README.md)
 
-一个适用于 Zotero 8 的插件：将 PDF 附件发送到 MinerU API 进行解析，并把结果保存回 Zotero 的 Markdown 附件，同时支持 AI 总结和 AI 翻译。
+一个适用于 Zotero 8/9 的插件：将 PDF 附件发送到 MinerU API 进行解析，并把结果保存回 Zotero 的 Markdown 附件，同时支持 AI 总结和 AI 翻译。
 
 ## 功能
 
@@ -17,7 +17,7 @@
 
 ## 运行要求
 
-- Zotero `8.0+`
+- Zotero `8.0` 到 `9.0.*`
 - 有效的 MinerU API Token
 - 如果要使用 AI 总结或 AI 翻译，还需要额外配置 LLM API
 

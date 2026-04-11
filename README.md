@@ -2,7 +2,7 @@
 
 [中文说明](README.zh-CN.md)
 
-A Zotero 8 plugin that sends PDF attachments to the MinerU API, saves parsed results back to Zotero as Markdown attachments, and supports AI summary and AI translation workflows.
+A Zotero 8/9 plugin that sends PDF attachments to the MinerU API, saves parsed results back to Zotero as Markdown attachments, and supports AI summary and AI translation workflows.
 
 ## Features
 
@@ -17,7 +17,7 @@ A Zotero 8 plugin that sends PDF attachments to the MinerU API, saves parsed res
 
 ## Requirements
 
-- Zotero `8.0+`
+- Zotero `8.0` to `9.0.*`
 - A valid MinerU API token
 - Optional LLM API credentials for summary and translation features
 

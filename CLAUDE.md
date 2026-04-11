@@ -1,11 +1,11 @@
 # Zotero MinerU Plugin
 
-Zotero 8 插件，调用 MinerU 官方 API 解析 PDF 为 Markdown 文件附件，并支持 LLM AI 中文总结。
+Zotero 8/9 插件，调用 MinerU 官方 API 解析 PDF 为 Markdown 文件附件，并支持 LLM AI 中文总结。
 
 ## 项目结构
 
 ```
-manifest.json          # 插件元数据 (Zotero 8.0+, ID: zotero-mineru@example.com)
+manifest.json          # 插件元数据 (Zotero 8.0 到 9.0.*, ID: zotero-mineru@example.com)
 bootstrap.js           # 插件生命周期入口 (install/startup/shutdown/uninstall)
 mineru.js              # 核心业务逻辑 (~2200 行，菜单注册、PDF 解析、AI 总结、Markdown→HTML)
 preferences.js         # 设置面板控制 (加载/保存/连接测试)
@@ -76,7 +76,7 @@ bash build-xpi.sh
 
 ### 菜单注册（双轨制）
 
-- **Zotero 8 MenuManager**（主路径）：`Zotero.MenuManager.registerMenu()` 注册 `ROOT_MENU_ID`，父菜单下包含解析、Markdown 转笔记、总结、翻译四个子项
+- **Zotero 8/9 MenuManager**（主路径）：`Zotero.MenuManager.registerMenu()` 注册 `ROOT_MENU_ID`，父菜单下包含解析、Markdown 转笔记、总结、翻译四个子项
 - **XUL 回退**（旧版兼容）：`createXULElement("menu")` + `menupopup` + `popupshowing` 事件
 
 上下文菜单现在是一个父菜单 + 四个子菜单项：
