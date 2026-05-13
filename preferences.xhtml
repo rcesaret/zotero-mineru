@@ -6,34 +6,34 @@
 	onload="if (window.ZoteroMineruPreferences) { window.ZoteroMineruPreferences.init(); }"
 >
 	<html:div class="mineru-pane">
-		<html:h2>MinerU PDF 解析设置</html:h2>
+		<html:h2>MinerU PDF Parsing Settings</html:h2>
 		<html:div class="mineru-grid">
 			<html:label for="mineru-api-base-url">API Base URL</html:label>
 			<html:input id="mineru-api-base-url" type="url" placeholder="https://mineru.net/api/v4" />
 
 			<html:label for="mineru-api-token">API Token</html:label>
-			<html:input id="mineru-api-token" type="password" placeholder="MinerU 控制台生成的 token" />
+			<html:input id="mineru-api-token" type="password" placeholder="Token generated in the MinerU console" />
 
-			<html:label for="mineru-model-version">模型版本</html:label>
+			<html:label for="mineru-model-version">Model Version</html:label>
 			<html:select id="mineru-model-version">
 				<html:option value="vlm">vlm</html:option>
 				<html:option value="pipeline">pipeline</html:option>
 			</html:select>
 
-			<html:label for="mineru-note-include-images">转化笔记时带图</html:label>
+			<html:label for="mineru-note-include-images">Embed Images in Notes</html:label>
 			<html:input id="mineru-note-include-images" type="checkbox" />
 
-			<html:label for="mineru-poll-interval-sec">轮询间隔(秒)</html:label>
+			<html:label for="mineru-poll-interval-sec">Poll Interval (s)</html:label>
 			<html:input id="mineru-poll-interval-sec" type="number" min="1" max="60" step="1" />
 
-			<html:label for="mineru-timeout-sec">请求超时(秒)</html:label>
+			<html:label for="mineru-timeout-sec">Request Timeout (s)</html:label>
 			<html:input id="mineru-timeout-sec" type="number" min="5" max="3600" step="1" />
 
-			<html:label for="mineru-note-title-prefix">笔记标题前缀</html:label>
+			<html:label for="mineru-note-title-prefix">Note Title Prefix</html:label>
 			<html:input id="mineru-note-title-prefix" type="text" />
 		</html:div>
 
-		<html:h3>LLM 设置（AI 总结 / 翻译功能）</html:h3>
+		<html:h3>LLM Settings (AI Summary / Translation)</html:h3>
 		<html:div class="mineru-grid">
 			<html:label for="mineru-llm-api-base-url">LLM API Base URL</html:label>
 			<html:input id="mineru-llm-api-base-url" type="url" placeholder="https://api.deepseek.com/v1" />
@@ -41,48 +41,32 @@
 			<html:label for="mineru-llm-api-key">LLM API Key</html:label>
 			<html:input id="mineru-llm-api-key" type="password" placeholder="sk-..." />
 
-			<html:label for="mineru-llm-model">LLM 模型名称</html:label>
+			<html:label for="mineru-llm-model">LLM Model Name</html:label>
 			<html:input id="mineru-llm-model" type="text" placeholder="deepseek-chat" />
 
-			<html:label for="mineru-summary-language">总结语言</html:label>
-			<html:select id="mineru-summary-language">
-				<html:option value="中文">中文</html:option>
-				<html:option value="English">English</html:option>
-				<html:option value="日本語">日本語</html:option>
-				<html:option value="한국어">한국어</html:option>
-				<html:option value="Français">Français</html:option>
-				<html:option value="Deutsch">Deutsch</html:option>
-				<html:option value="Español">Español</html:option>
-			</html:select>
+			<html:label for="mineru-summary-language">Summary Language</html:label>
+			<html:input id="mineru-summary-language" type="text" placeholder="English" />
 
-			<html:label for="mineru-summary-request-json">总结额外 JSON 参数</html:label>
+			<html:label for="mineru-summary-request-json">Summary Extra JSON Params</html:label>
 			<html:textarea
 				id="mineru-summary-request-json"
 				rows="4"
 				placeholder='{"enable_thinking": true}'
 			></html:textarea>
 
-			<html:label for="mineru-translate-language">翻译目标语言</html:label>
-			<html:select id="mineru-translate-language">
-				<html:option value="中文">中文</html:option>
-				<html:option value="English">English</html:option>
-				<html:option value="日本語">日本語</html:option>
-				<html:option value="한국어">한국어</html:option>
-				<html:option value="Français">Français</html:option>
-				<html:option value="Deutsch">Deutsch</html:option>
-				<html:option value="Español">Español</html:option>
-			</html:select>
+			<html:label for="mineru-translate-language">Translation Target Language</html:label>
+			<html:input id="mineru-translate-language" type="text" placeholder="English" />
 
-			<html:label for="mineru-translate-chunk-size">翻译分段字符数</html:label>
+			<html:label for="mineru-translate-chunk-size">Translation Chunk Size (chars)</html:label>
 			<html:input id="mineru-translate-chunk-size" type="number" min="5000" max="60000" step="1000" />
 
-			<html:label for="mineru-translate-concurrency">翻译并发请求数</html:label>
+			<html:label for="mineru-translate-concurrency">Translation Concurrency</html:label>
 			<html:input id="mineru-translate-concurrency" type="number" min="1" max="8" step="1" />
 
-			<html:label for="mineru-translate-retry-count">翻译自动重试次数</html:label>
+			<html:label for="mineru-translate-retry-count">Translation Auto-Retry Count</html:label>
 			<html:input id="mineru-translate-retry-count" type="number" min="1" max="5" step="1" />
 
-			<html:label for="mineru-translate-request-json">翻译额外 JSON 参数</html:label>
+			<html:label for="mineru-translate-request-json">Translation Extra JSON Params</html:label>
 			<html:textarea
 				id="mineru-translate-request-json"
 				rows="4"
@@ -90,14 +74,14 @@
 			></html:textarea>
 		</html:div>
 		<html:div class="mineru-actions">
-			<html:button id="mineru-save-button" type="button">保存</html:button>
-			<html:button id="mineru-test-button" type="button">测试 MinerU 连接</html:button>
-			<html:button id="mineru-test-llm-button" type="button">测试当前 LLM 配置</html:button>
+			<html:button id="mineru-save-button" type="button">Save</html:button>
+			<html:button id="mineru-test-button" type="button">Test MinerU Connection</html:button>
+			<html:button id="mineru-test-llm-button" type="button">Test Current LLM Config</html:button>
 			<html:span id="mineru-status"></html:span>
 		</html:div>
 		<html:pre id="mineru-test-output" class="mineru-test-output"></html:pre>
 		<html:p class="mineru-help">
-			调用官方 MinerU API 流程：申请上传地址、上传 PDF、轮询任务结果、下载完整结果 ZIP，并将 Markdown 保存为附件；如需 Zotero 笔记，可通过右键菜单转换。
+			Pipeline for the official MinerU API: request an upload URL, upload the PDF, poll for the job result, download the full result ZIP, and save the Markdown as an attachment. To create a Zotero note instead, use the right-click menu.
 		</html:p>
 	</html:div>
 	<html:script src="preferences.js"></html:script>

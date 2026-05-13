@@ -47,10 +47,10 @@ var ZoteroMineruPreferences = {
 			parsed = JSON.parse(normalized);
 		}
 		catch (e) {
-			throw new Error(`${fieldLabel} 不是合法 JSON：${e.message || e}`);
+			throw new Error(`${fieldLabel} is not valid JSON: ${e.message || e}`);
 		}
 		if (!parsed || Array.isArray(parsed) || typeof parsed !== "object") {
-			throw new Error(`${fieldLabel} 必须是 JSON 对象`);
+			throw new Error(`${fieldLabel} must be a JSON object`);
 		}
 		return parsed;
 	},
@@ -62,7 +62,7 @@ var ZoteroMineruPreferences = {
 		}
 		for (let [key, value] of Object.entries(extraPayload)) {
 			if (reservedKeys.includes(key)) {
-				throw new Error(`额外 JSON 参数不能覆盖保留字段：${reservedKeys.join(", ")}`);
+				throw new Error(`Extra JSON params cannot override reserved fields: ${reservedKeys.join(", ")}`);
 			}
 			mergedPayload[key] = value;
 		}
@@ -100,7 +100,7 @@ var ZoteroMineruPreferences = {
 				let intValue = parseInt(value, 10);
 				if (!Number.isFinite(intValue) || intValue <= 0) {
 					if (!silent) {
-						this.setStatus("数值字段必须是正整数", true);
+						this.setStatus("Numeric fields must be positive integers", true);
 					}
 					return;
 				}
@@ -110,8 +110,8 @@ var ZoteroMineruPreferences = {
 			if (["summaryRequestJSON", "translateRequestJSON"].includes(field.pref)) {
 				try {
 					let fieldLabel = field.pref === "summaryRequestJSON"
-						? "总结额外 JSON 参数"
-						: "翻译额外 JSON 参数";
+						? "Summary extra JSON params"
+						: "Translation extra JSON params";
 					this.parseOptionalJSONObject(value, fieldLabel);
 				}
 				catch (e) {
@@ -127,7 +127,7 @@ var ZoteroMineruPreferences = {
 			Zotero.Prefs.set(this.PREF_BRANCH + field.pref, value.trim(), true);
 		}
 		if (!silent) {
-			this.setStatus("已保存");
+			this.setStatus("Saved");
 		}
 		return true;
 	},
@@ -165,8 +165,8 @@ var ZoteroMineruPreferences = {
 		this.saveSettings({ silent: true });
 		let settings = this.readCurrentSettings();
 		if (!settings.apiToken) {
-			this.setStatus("测试失败：Token 为空", true);
-			this.setOutput("请先填写 API Token。");
+			this.setStatus("Test failed: token is empty", true);
+			this.setOutput("Please fill in the API Token first.");
 			return;
 		}
 
@@ -184,8 +184,8 @@ var ZoteroMineruPreferences = {
 		let controller = new AbortController();
 		let timeoutID = setTimeout(() => controller.abort(), settings.timeoutMS);
 		try {
-			this.setStatus("正在测试 MinerU 连接...");
-			this.setOutput(`POST ${endpoint}\nToken长度: ${settings.apiToken.length}`);
+			this.setStatus("Testing MinerU connection...");
+			this.setOutput(`POST ${endpoint}\nToken length: ${settings.apiToken.length}`);
 
 			let response = await fetch(endpoint, {
 				method: "POST",
@@ -206,18 +206,18 @@ var ZoteroMineruPreferences = {
 			catch (_e) {}
 
 			if (response.status === 401 || response.status === 403) {
-				this.setStatus("测试失败：Token 无效或权限不足", true);
+				this.setStatus("Test failed: invalid token or insufficient permissions", true);
 				this.setOutput(`HTTP ${response.status}\n${text.slice(0, 1200)}`);
 				return;
 			}
 			if (!response.ok) {
-				this.setStatus(`测试失败：HTTP ${response.status}`, true);
+				this.setStatus(`Test failed: HTTP ${response.status}`, true);
 				this.setOutput(text.slice(0, 1200));
 				return;
 			}
 
 			if (json && json.code === 0) {
-				this.setStatus("MinerU 连接成功：Token 可用");
+				this.setStatus("MinerU connection succeeded: token is valid");
 				this.setOutput(JSON.stringify({
 					endpoint,
 					code: json.code,
@@ -227,12 +227,12 @@ var ZoteroMineruPreferences = {
 				return;
 			}
 
-			this.setStatus("已连通，但接口返回业务错误", true);
+			this.setStatus("Connected, but the API returned a business error", true);
 			this.setOutput((json ? JSON.stringify(json, null, 2) : text).slice(0, 1200));
 		}
 		catch (e) {
-			let msg = e?.name === "AbortError" ? "请求超时" : (e.message || String(e));
-			this.setStatus("测试失败：" + msg, true);
+			let msg = e?.name === "AbortError" ? "Request timed out" : (e.message || String(e));
+			this.setStatus("Test failed: " + msg, true);
 			this.setOutput(msg);
 		}
 		finally {
@@ -274,7 +274,7 @@ var ZoteroMineruPreferences = {
 			catch (_e) {}
 
 			if (response.status === 401 || response.status === 403) {
-				throw new Error(`API Key 无效或权限不足（HTTP ${response.status}）`);
+				throw new Error(`API Key is invalid or has insufficient permissions (HTTP ${response.status})`);
 			}
 			if (!response.ok) {
 				throw new Error(`HTTP ${response.status}: ${text.slice(0, 500)}`);
@@ -282,7 +282,7 @@ var ZoteroMineruPreferences = {
 
 			let reply = json?.choices?.[0]?.message?.content || "";
 			if (!reply) {
-				throw new Error("LLM 未返回有效回复");
+				throw new Error("LLM did not return a valid reply");
 			}
 
 			return {
@@ -293,7 +293,7 @@ var ZoteroMineruPreferences = {
 		}
 		catch (e) {
 			if (e?.name === "AbortError") {
-				throw new Error(`请求超时（${Math.round(timeoutMS / 1000)}秒）`);
+				throw new Error(`Request timed out (${Math.round(timeoutMS / 1000)}s)`);
 			}
 			throw e;
 		}
@@ -306,19 +306,19 @@ var ZoteroMineruPreferences = {
 		if (!this.saveSettings()) return;
 		let llm = this.readLLMSettings();
 		if (!llm.apiBaseURL || !llm.apiKey || !llm.model) {
-			this.setStatus("测试失败：LLM 设置不完整", true);
-			this.setOutput("请先填写 LLM API Base URL、API Key 和模型名称。");
+			this.setStatus("Test failed: LLM settings incomplete", true);
+			this.setOutput("Please fill in the LLM API Base URL, API Key, and model name first.");
 			return;
 		}
 
 		let endpoint = llm.apiBaseURL + "/chat/completions";
 		try {
-			let summaryRequestParams = this.parseOptionalJSONObject(llm.summaryRequestJSON, "总结额外 JSON 参数");
-			let translateRequestParams = this.parseOptionalJSONObject(llm.translateRequestJSON, "翻译额外 JSON 参数");
+			let summaryRequestParams = this.parseOptionalJSONObject(llm.summaryRequestJSON, "Summary extra JSON params");
+			let translateRequestParams = this.parseOptionalJSONObject(llm.translateRequestJSON, "Translation extra JSON params");
 			let testCases = [
 				{
 					label: "summary",
-					description: "总结配置",
+					description: "Summary config",
 					extraParams: summaryRequestParams,
 					payload: {
 						model: llm.model,
@@ -331,7 +331,7 @@ var ZoteroMineruPreferences = {
 				},
 				{
 					label: "translation",
-					description: "翻译配置",
+					description: "Translation config",
 					extraParams: translateRequestParams,
 					payload: {
 						model: llm.model,
@@ -344,7 +344,7 @@ var ZoteroMineruPreferences = {
 				}
 			];
 
-			this.setStatus("正在测试当前 LLM 配置...");
+			this.setStatus("Testing current LLM config...");
 			this.setOutput(JSON.stringify({
 				endpoint,
 				model: llm.model,
@@ -388,7 +388,7 @@ var ZoteroMineruPreferences = {
 			}
 
 			if (failures.length) {
-				this.setStatus("当前 LLM 配置测试失败", true);
+				this.setStatus("Current LLM config test failed", true);
 				this.setOutput(JSON.stringify({
 					endpoint,
 					model: llm.model,
@@ -398,7 +398,7 @@ var ZoteroMineruPreferences = {
 				return;
 			}
 
-			this.setStatus("当前 LLM 配置测试成功");
+			this.setStatus("Current LLM config test succeeded");
 			this.setOutput(JSON.stringify({
 				endpoint,
 				model: llm.model,
@@ -407,7 +407,7 @@ var ZoteroMineruPreferences = {
 		}
 		catch (e) {
 			let msg = e.message || String(e);
-			this.setStatus("LLM 测试失败：" + msg, true);
+			this.setStatus("LLM test failed: " + msg, true);
 			this.setOutput(msg);
 		}
 	},
@@ -425,7 +425,7 @@ var ZoteroMineruPreferences = {
 				testButton.addEventListener("click", () => {
 					this.testConnection().catch((e) => {
 						Zotero.logError(e);
-						this.setStatus(`测试失败: ${e.message || e}`, true);
+						this.setStatus(`Test failed: ${e.message || e}`, true);
 					});
 				});
 			}
@@ -434,7 +434,7 @@ var ZoteroMineruPreferences = {
 				testLLMButton.addEventListener("click", () => {
 					this.testLLMConnection().catch((e) => {
 						Zotero.logError(e);
-						this.setStatus(`LLM 测试失败: ${e.message || e}`, true);
+						this.setStatus(`LLM test failed: ${e.message || e}`, true);
 					});
 				});
 			}
@@ -448,7 +448,7 @@ var ZoteroMineruPreferences = {
 		}
 		catch (e) {
 			Zotero.logError(e);
-			this.setStatus(`设置页初始化失败: ${e.message || e}`, true);
+			this.setStatus(`Settings page initialization failed: ${e.message || e}`, true);
 		}
 	}
 };

@@ -40,35 +40,35 @@ ZoteroMineru = {
 		return [
 			{
 				id: this.CONTEXT_MENU_ID,
-				label: "使用 MinerU 解析 PDF 并保存为 Markdown",
+				label: "Parse PDF with MinerU and Save as Markdown",
 				l10nID: "zotero-mineru-menu-parse-pdf",
 				getTasks: (selectedItems) => this.collectPDFTasks(selectedItems),
 				run: ({ window, selectedItems }) => this.handleParseCommand({ window, selectedItems }),
-				errorPrefix: "执行失败"
+				errorPrefix: "Execution failed"
 			},
 			{
 				id: this.MARKDOWN_NOTE_MENU_ID,
-				label: "将 MinerU Markdown 转为笔记",
+				label: "Convert MinerU Markdown to Note",
 				l10nID: "zotero-mineru-menu-markdown-to-note",
 				getTasks: (selectedItems) => this.collectMarkdownToNoteTasks(selectedItems),
 				run: ({ window, selectedItems }) => this.handleMarkdownToNoteCommand({ window, selectedItems }),
-				errorPrefix: "转笔记失败"
+				errorPrefix: "Markdown to note conversion failed"
 			},
 			{
 				id: this.SUMMARY_MENU_ID,
-				label: "使用 AI 总结文献",
+				label: "Summarize with AI",
 				l10nID: "zotero-mineru-menu-ai-summary",
 				getTasks: (selectedItems) => this.collectSummaryTasks(selectedItems),
 				run: ({ window, selectedItems }) => this.handleSummaryCommand({ window, selectedItems }),
-				errorPrefix: "AI 总结失败"
+				errorPrefix: "AI summary failed"
 			},
 			{
 				id: this.TRANSLATE_MENU_ID,
-				label: "使用 AI 翻译文献",
+				label: "Translate with AI",
 				l10nID: "zotero-mineru-menu-ai-translate",
 				getTasks: (selectedItems) => this.collectTranslateTasks(selectedItems),
 				run: ({ window, selectedItems }) => this.handleTranslateCommand({ window, selectedItems }),
-				errorPrefix: "AI 翻译失败"
+				errorPrefix: "AI translation failed"
 			}
 		];
 	},
@@ -424,7 +424,7 @@ ZoteroMineru = {
 	async handleParseCommand({ window = null, selectedItems = null } = {}) {
 		let settings = this.getSettings();
 		if (!settings.apiToken) {
-			this.showAlert(window, "MinerU", "请先在设置中填写 MinerU 官方 API Token。");
+			this.showAlert(window, "MinerU", "Please fill in the MinerU API Token in settings first.");
 			return;
 		}
 		
@@ -433,12 +433,12 @@ ZoteroMineru = {
 			|| [];
 		let tasks = this.collectPDFTasks(items);
 		if (!tasks.length) {
-			this.showAlert(window, "MinerU", "当前选择里没有可解析的 PDF 附件。");
+			this.showAlert(window, "MinerU", "No PDF attachments in the current selection that can be parsed.");
 			return;
 		}
 		
 		let progress = new Zotero.ProgressWindow({ closeOnClick: true });
-		progress.changeHeadline("MinerU PDF 解析");
+		progress.changeHeadline("MinerU PDF Parsing");
 		progress.show();
 		
 		let successes = 0;
@@ -451,7 +451,7 @@ ZoteroMineru = {
 				title
 			);
 			let updateItemStatus = ({ text = "", percent = null } = {}) => {
-				let label = text ? `${title}（${text}）` : title;
+				let label = text ? `${title} (${text})` : title;
 				if (typeof itemProgress.setText === "function") {
 					itemProgress.setText(label);
 				}
@@ -461,19 +461,19 @@ ZoteroMineru = {
 			};
 			try {
 				updateItemStatus({
-					text: "准备解析",
+					text: "Preparing",
 					percent: 5
 				});
 					let parsedResult = await this.parseAttachmentWithMineru(task.attachment, settings, {
 						onStatus: (statusInfo) => {
 							updateItemStatus({
-								text: statusInfo?.displayText || statusInfo?.phase || "处理中",
+								text: statusInfo?.displayText || statusInfo?.phase || "Processing",
 								percent: statusInfo?.progress ?? null
 							});
 					}
 				});
 				updateItemStatus({
-					text: "保存 Markdown",
+					text: "Saving Markdown",
 					percent: 85
 				});
 					await this.saveResultAsMarkdownAttachment({
@@ -483,24 +483,24 @@ ZoteroMineru = {
 						settings
 					});
 				updateItemStatus({
-					text: "完成",
+					text: "Done",
 					percent: 100
 				});
 				successes++;
 			}
 			catch (e) {
-				updateItemStatus({ text: "失败" });
+				updateItemStatus({ text: "Failed" });
 				itemProgress.setError();
 				failures.push(`${title}: ${e.message || e}`);
 				Zotero.logError(e);
 			}
 		}
 		
-		progress.addDescription(`完成 ${successes}/${tasks.length}`);
+		progress.addDescription(`Done ${successes}/${tasks.length}`);
 		progress.startCloseTimer(5000);
-		
+
 		if (failures.length) {
-			this.showAlert(window, "MinerU 部分失败", failures.slice(0, 10).join("\n"));
+			this.showAlert(window, "MinerU: some items failed", failures.slice(0, 10).join("\n"));
 		}
 	},
 	
@@ -521,19 +521,19 @@ ZoteroMineru = {
 		let phase = (statusContext.phase || "").trim();
 		let mineruState = (statusContext.mineruState || "").trim();
 		if (phase && mineruState) {
-			return `${phase}，MinerU 状态: ${mineruState}`;
+			return `${phase}, MinerU state: ${mineruState}`;
 		}
 		if (phase) {
 			return phase;
 		}
 		if (mineruState) {
-			return `MinerU 状态: ${mineruState}`;
+			return `MinerU state: ${mineruState}`;
 		}
 		return "";
 	},
 
 	wrapErrorWithParseStatus(error, statusContext) {
-		if (error instanceof Error && error.message.includes("当前状态:")) {
+		if (error instanceof Error && error.message.includes("current state:")) {
 			return error;
 		}
 		let baseMessage = error instanceof Error ? error.message : String(error);
@@ -541,14 +541,14 @@ ZoteroMineru = {
 		if (!statusText) {
 			return error instanceof Error ? error : new Error(baseMessage);
 		}
-		let wrapped = new Error(`${baseMessage}（当前状态: ${statusText}）`);
+		let wrapped = new Error(`${baseMessage} (current state: ${statusText})`);
 		wrapped.cause = error;
 		return wrapped;
 	},
 
 	async parseAttachmentWithMineru(attachment, settings, options = {}) {
 		let statusContext = {
-			phase: "准备解析",
+			phase: "Preparing",
 			mineruState: "",
 			progress: 5,
 			onStatus: options.onStatus
@@ -557,12 +557,12 @@ ZoteroMineru = {
 
 		try {
 			this.reportParseStatus(statusContext, {
-				phase: "读取本地 PDF",
+				phase: "Reading local PDF",
 				progress: 10
 			});
 			let filePath = attachment.getFilePath();
 			if (!filePath) {
-				throw new Error("附件文件不存在或尚未下载到本地");
+				throw new Error("Attachment file does not exist or has not been downloaded locally");
 			}
 			
 			let fileBytes = await IOUtils.read(filePath);
@@ -580,7 +580,7 @@ ZoteroMineru = {
 			};
 			
 			this.reportParseStatus(statusContext, {
-				phase: "申请上传地址",
+				phase: "Requesting upload URL",
 				progress: 20
 			});
 			let applyUploadResult = await this.requestMineruJSON({
@@ -590,17 +590,17 @@ ZoteroMineru = {
 				body: uploadPayload
 			});
 			if (applyUploadResult.code !== 0) {
-				throw new Error(`申请上传地址失败: ${applyUploadResult.msg || "unknown error"}`);
+				throw new Error(`Failed to request upload URL: ${applyUploadResult.msg || "unknown error"}`);
 			}
 			
 			let batchID = applyUploadResult?.data?.batch_id;
 			let uploadURL = applyUploadResult?.data?.file_urls?.[0];
 			if (!batchID || !uploadURL) {
-				throw new Error("官方 API 未返回 batch_id 或 upload_url");
+				throw new Error("Official API did not return batch_id or upload_url");
 			}
-			
+
 			this.reportParseStatus(statusContext, {
-				phase: "上传 PDF",
+				phase: "Uploading PDF",
 				progress: 35
 			});
 			let uploadResponse = await fetch(uploadURL, {
@@ -609,11 +609,11 @@ ZoteroMineru = {
 			});
 			if (!uploadResponse.ok) {
 				let errText = await uploadResponse.text();
-				throw new Error(`上传 PDF 失败 ${uploadResponse.status}: ${errText.slice(0, 300)}`);
+				throw new Error(`Failed to upload PDF ${uploadResponse.status}: ${errText.slice(0, 300)}`);
 			}
-			
+
 			this.reportParseStatus(statusContext, {
-				phase: "等待 MinerU 解析",
+				phase: "Waiting for MinerU parse",
 				progress: 55
 			});
 			let result = await this.pollMineruExtractResult({
@@ -628,11 +628,11 @@ ZoteroMineru = {
 			
 			let zipURL = result?.full_zip_url;
 			if (!zipURL) {
-				throw new Error("解析已完成，但未返回 full_zip_url");
+				throw new Error("Parsing complete but full_zip_url is missing");
 			}
-			
+
 			this.reportParseStatus(statusContext, {
-				phase: "下载解析结果",
+				phase: "Downloading parse result",
 				progress: 75
 			});
 			let zipBytes = await this.downloadParseResultZip({
@@ -643,12 +643,12 @@ ZoteroMineru = {
 			});
 			
 			this.reportParseStatus(statusContext, {
-				phase: "提取 Markdown",
+				phase: "Extracting Markdown",
 				progress: 90
 			});
 			let parsedResult = await this.extractNoteContentFromMineruZip(zipBytes, fileName);
 			this.reportParseStatus(statusContext, {
-				phase: "提取完成",
+				phase: "Extraction complete",
 				progress: 95
 			});
 			return parsedResult;
@@ -666,7 +666,7 @@ ZoteroMineru = {
 	normalizeDownloadURL(downloadURL, apiBaseURL) {
 		let raw = (downloadURL || "").toString().trim();
 		if (!raw) {
-			throw new Error("下载链接为空");
+			throw new Error("Download URL is empty");
 		}
 		if (raw.startsWith("//")) {
 			raw = `https:${raw}`;
@@ -676,10 +676,10 @@ ZoteroMineru = {
 			normalized = new URL(raw, `${apiBaseURL}/`);
 		}
 		catch (_e) {
-			throw new Error(`下载链接格式非法: ${raw.slice(0, 200)}`);
+			throw new Error(`Download URL has invalid format: ${raw.slice(0, 200)}`);
 		}
 		if (!["http:", "https:"].includes(normalized.protocol)) {
-			throw new Error(`下载链接协议不支持: ${normalized.protocol}`);
+			throw new Error(`Download URL protocol is not supported: ${normalized.protocol}`);
 		}
 		return normalized.toString();
 	},
@@ -719,19 +719,19 @@ ZoteroMineru = {
 			});
 		};
 
-		addCandidate(normalizedURL, false, "直连下载");
-		addCandidate(normalizedURL, true, "直连下载（Bearer）");
+		addCandidate(normalizedURL, false, "Direct");
+		addCandidate(normalizedURL, true, "Direct (Bearer)");
 		if (normalizedURL.startsWith("http://")) {
 			let httpsURL = `https://${normalizedURL.slice("http://".length)}`;
-			addCandidate(httpsURL, false, "HTTPS 回退");
-			addCandidate(httpsURL, true, "HTTPS 回退（Bearer）");
+			addCandidate(httpsURL, false, "HTTPS fallback");
+			addCandidate(httpsURL, true, "HTTPS fallback (Bearer)");
 		}
 
 		let failures = [];
 		for (let i = 0; i < candidates.length; i++) {
 			let attempt = candidates[i];
 			this.reportParseStatus(statusContext, {
-				phase: `下载解析结果（${attempt.label}，${i + 1}/${candidates.length}）`,
+				phase: `Downloading parse result (${attempt.label}, ${i + 1}/${candidates.length})`,
 				progress: 75
 			});
 			try {
@@ -746,7 +746,7 @@ ZoteroMineru = {
 					if (i < candidates.length - 1) {
 						continue;
 					}
-					throw new Error(`下载解析结果失败 ${response.status}: ${errText.slice(0, 300)}`);
+					throw new Error(`Failed to download parse result ${response.status}: ${errText.slice(0, 300)}`);
 				}
 				return new Uint8Array(await response.arrayBuffer());
 			}
@@ -761,7 +761,7 @@ ZoteroMineru = {
 
 		let urlHint = this.maskURLForError(normalizedURL);
 		let reason = failures.length ? failures[failures.length - 1] : "unknown";
-		throw new Error(`下载解析结果网络失败 (${urlHint})：${reason}`);
+		throw new Error(`Network error downloading parse result (${urlHint}): ${reason}`);
 	},
 		
 	async requestMineruJSON({ url, token, method = "GET", body = null }) {
@@ -781,14 +781,14 @@ ZoteroMineru = {
 		let response = await fetch(url, requestOptions);
 		let responseText = await response.text();
 		if (!response.ok) {
-			throw new Error(`官方 API 请求失败 ${response.status}: ${responseText.slice(0, 500)}`);
+			throw new Error(`Official API request failed ${response.status}: ${responseText.slice(0, 500)}`);
 		}
-		
+
 		try {
 			return JSON.parse(responseText);
 		}
 		catch (_e) {
-			throw new Error(`官方 API 返回的 JSON 无法解析: ${responseText.slice(0, 500)}`);
+			throw new Error(`Could not parse JSON from official API: ${responseText.slice(0, 500)}`);
 		}
 	},
 	
@@ -801,7 +801,7 @@ ZoteroMineru = {
 				token
 			});
 			if (statusResult.code !== 0) {
-				throw new Error(`查询解析状态失败: ${statusResult.msg || "unknown error"}`);
+				throw new Error(`Failed to query parse status: ${statusResult.msg || "unknown error"}`);
 			}
 			
 			let extractResults = statusResult?.data?.extract_result || [];
@@ -817,12 +817,12 @@ ZoteroMineru = {
 				return result;
 			}
 			if (result?.state === "failed") {
-				throw new Error(result.err_msg || "MinerU 解析失败");
+				throw new Error(result.err_msg || "MinerU parse failed");
 			}
-			
+
 			await Zotero.Promise.delay(pollIntervalMS);
 		}
-		throw new Error(`MinerU 解析超时，最后状态: ${lastState || "unknown"}`);
+		throw new Error(`MinerU parse timed out; last state: ${lastState || "unknown"}`);
 	},
 	
 	async extractNoteContentFromMineruZip(zipBytes, originalFileName, options = {}) {
@@ -839,7 +839,7 @@ ZoteroMineru = {
 			zipReader.open(this.pathToNSIFile(zipPath));
 			let markdownEntryName = this.pickMarkdownEntry(zipReader, originalFileName);
 			if (!markdownEntryName) {
-				throw new Error("结果 ZIP 中没有找到 Markdown 文件");
+				throw new Error("No Markdown file found in result ZIP");
 			}
 
 			let markdownBytes = await this.readZipEntryBytes(zipReader, tempDir, markdownEntryName);
@@ -1118,7 +1118,7 @@ ZoteroMineru = {
 			binary += String.fromCharCode.apply(null, chunk);
 		}
 		if (typeof btoa !== "function") {
-			throw new Error("当前环境不支持 btoa，无法内嵌图片资源");
+			throw new Error("btoa is not available in this environment; cannot inline image resources");
 		}
 		return btoa(binary);
 	},
@@ -1911,7 +1911,7 @@ ZoteroMineru = {
 			note.setField("title", cleanTitle);
 		}
 		catch (e) {
-			this.log(`设置笔记标题失败: ${e?.message || e}`);
+			this.log(`Failed to set note title: ${e?.message || e}`);
 		}
 	},
 
@@ -2155,7 +2155,7 @@ ZoteroMineru = {
 				await parentItem.saveTx()
 			}
 
-			this.log(`Markdown 附件已保存: ${mdFileName} (${imageFileMap.size} 张图片)`)
+			this.log(`Markdown attachment saved: ${mdFileName} (${imageFileMap.size} images)`)
 		}
 		finally {
 			// Clean up temp files
@@ -2301,7 +2301,7 @@ ZoteroMineru = {
 		let includeImages = options.includeImages === true
 		let markdownPath = await markdownAttachment.getFilePath()
 		if (!markdownPath) {
-			throw new Error("MinerU Markdown 附件文件不存在")
+			throw new Error("MinerU Markdown attachment file does not exist")
 		}
 		let fileBytes = await IOUtils.read(markdownPath)
 		let markdownText = new TextDecoder("utf-8").decode(fileBytes)
@@ -2346,7 +2346,7 @@ ZoteroMineru = {
 						parentItemID: noteID
 					}),
 					15000,
-					"导入内嵌图片"
+					"Importing embedded image"
 				);
 				return attachmentItem?.key || null;
 			}
@@ -2358,11 +2358,11 @@ ZoteroMineru = {
 		return null;
 	},
 
-	async withTimeout(taskFactory, timeoutMS, label = "任务") {
+	async withTimeout(taskFactory, timeoutMS, label = "Task") {
 		let timeoutID = null;
 		let timeoutPromise = new Promise((_, reject) => {
 			timeoutID = setTimeout(() => {
-				let error = new Error(`${label}超时（${Math.ceil(timeoutMS / 1000)}秒）`);
+				let error = new Error(`${label} timed out (${Math.ceil(timeoutMS / 1000)}s)`);
 				error.name = "TimeoutError";
 				error.code = "ETIMEDOUT";
 				error.timeoutMS = timeoutMS;
@@ -2386,19 +2386,19 @@ ZoteroMineru = {
 		return !!(error && (error.name === "TimeoutError" || error.code === "ETIMEDOUT"));
 	},
 
-	formatUserFacingError(error, fallbackMessage = "执行失败") {
+	formatUserFacingError(error, fallbackMessage = "Execution failed") {
 		let message = error?.message || String(error || fallbackMessage)
 		if (!message) return fallbackMessage
 		if (this.isTimeoutError(error)) {
-			return `${message}。可尝试减小“翻译并发请求数”或“翻译分段字符数”后重试。`
+			return `${message}. Try reducing "Translation Concurrency" or "Translation Chunk Size" and retry.`
 		}
 		return message
 	},
 
 	buildChunkFailureMessage(failure) {
-		let chunkLabel = `第 ${failure.chunkIndex + 1}/${failure.totalChunks} 段`
-		let attemptsLabel = failure.attempts > 1 ? `（已尝试 ${failure.attempts} 次）` : ""
-		return `${chunkLabel}${attemptsLabel}: ${this.formatUserFacingError(failure.error, "翻译失败")}`
+		let chunkLabel = `Chunk ${failure.chunkIndex + 1}/${failure.totalChunks}`
+		let attemptsLabel = failure.attempts > 1 ? ` (attempted ${failure.attempts} times)` : ""
+		return `${chunkLabel}${attemptsLabel}: ${this.formatUserFacingError(failure.error, "Translation failed")}`
 	},
 
 	buildFailedChunkSummary(failures, limit = 10) {
@@ -2414,16 +2414,16 @@ ZoteroMineru = {
 		let hiddenCount = Math.max(failures.length - 8, 0)
 		let message =
 			`${title}\n\n` +
-			`以下段落在自动重试 ${autoRetryCount} 次后仍然失败：\n` +
+			`The following chunks still failed after ${autoRetryCount} automatic retries:\n` +
 			`${summary}`
 		if (hiddenCount) {
-			message += `\n… 另有 ${hiddenCount} 段失败`
+			message += `\n… and ${hiddenCount} more failed chunks`
 		}
-		message += `\n\n是否现在只重试这些失败段落？`
+		message += `\n\nRetry only these failed chunks now?`
 		if (retryRound > 1) {
-			message += `\n这是第 ${retryRound} 轮人工确认重试。`
+			message += `\nThis is manual retry round ${retryRound}.`
 		}
-		return this.showConfirm(window, "AI 翻译失败段重试", message)
+		return this.showConfirm(window, "AI translation: retry failed chunks", message)
 	},
 
 	replaceImageMarkerWithAttachment(html, marker, attachmentKey, mimeType, fileName) {
@@ -2513,9 +2513,9 @@ ZoteroMineru = {
 		let apiKey = (Zotero.Prefs.get(this.PREF_BRANCH + "llmApiKey", true) || "").trim();
 		apiKey = apiKey.replace(/^Bearer\s+/i, "");
 		let model = (Zotero.Prefs.get(this.PREF_BRANCH + "llmModel", true) || "").trim();
-		let summaryLanguage = (Zotero.Prefs.get(this.PREF_BRANCH + "summaryLanguage", true) || "中文").trim();
+		let summaryLanguage = (Zotero.Prefs.get(this.PREF_BRANCH + "summaryLanguage", true) || "English").trim();
 		let summaryRequestJSON = (Zotero.Prefs.get(this.PREF_BRANCH + "summaryRequestJSON", true) || "").trim();
-		let translateLanguage = (Zotero.Prefs.get(this.PREF_BRANCH + "translateLanguage", true) || "中文").trim();
+		let translateLanguage = (Zotero.Prefs.get(this.PREF_BRANCH + "translateLanguage", true) || "English").trim();
 		let translateChunkSize = Zotero.Prefs.get(this.PREF_BRANCH + "translateChunkSize", true);
 		if (!Number.isFinite(translateChunkSize) || translateChunkSize < 5000) translateChunkSize = 20000;
 		let translateConcurrency = parseInt(Zotero.Prefs.get(this.PREF_BRANCH + "translateConcurrency", true), 10);
@@ -2547,10 +2547,10 @@ ZoteroMineru = {
 			parsed = JSON.parse(normalized);
 		}
 		catch (e) {
-			throw new Error(`${fieldLabel} 不是合法 JSON：${e.message || e}`);
+			throw new Error(`${fieldLabel} is not valid JSON: ${e.message || e}`);
 		}
 		if (!parsed || Array.isArray(parsed) || typeof parsed !== "object") {
-			throw new Error(`${fieldLabel} 必须是 JSON 对象`);
+			throw new Error(`${fieldLabel} must be a JSON object`);
 		}
 		return parsed;
 	},
@@ -2562,7 +2562,7 @@ ZoteroMineru = {
 		}
 		for (let [key, value] of Object.entries(extraPayload)) {
 			if (reservedKeys.includes(key)) {
-				throw new Error(`翻译额外 JSON 参数不能覆盖保留字段：${reservedKeys.join(", ")}`);
+				throw new Error(`Extra JSON params cannot override reserved fields: ${reservedKeys.join(", ")}`);
 			}
 			mergedPayload[key] = value;
 		}
@@ -2635,20 +2635,20 @@ ZoteroMineru = {
 			|| []
 		let tasks = this.collectMarkdownToNoteTasks(items)
 		if (!tasks.length) {
-			this.showAlert(window, "MinerU", "当前选择里没有可转为笔记的 MinerU Markdown 附件。\n（已有 #MinerU-Parse 笔记的条目会被跳过）")
+			this.showAlert(window, "MinerU", "No MinerU Markdown attachments in the current selection that can be converted to notes.\n(Items already having a #MinerU-Parse note are skipped.)")
 			return
 		}
 		let shouldContinue = this.showConfirm(
 			window,
-			"MinerU Markdown 转笔记",
-			"提示：如果笔记过长，可能会导致同步失败。\n\n是否继续转化为笔记？"
+			"MinerU Markdown to Note",
+			"Note: very long notes may cause sync failures.\n\nContinue converting to note?"
 		)
 		if (!shouldContinue) {
 			return
 		}
 
 		let progress = new Zotero.ProgressWindow({ closeOnClick: true })
-		progress.changeHeadline("MinerU Markdown 转笔记")
+		progress.changeHeadline("MinerU Markdown to Note")
 		progress.show()
 
 		let successes = 0
@@ -2657,21 +2657,21 @@ ZoteroMineru = {
 		for (let task of tasks) {
 			let title = task.parentItem?.getField("title")
 				|| task.sourceAttachment.getField("title")
-				|| "未知文献"
+				|| "Untitled item"
 			let itemProgress = new progress.ItemProgress(
 				"chrome://zotero/skin/treeitem-note.png",
 				title
 			)
 			try {
 				if (typeof itemProgress.setText === "function") {
-					itemProgress.setText(`${title}（读取 Markdown）`)
+					itemProgress.setText(`${title} (reading Markdown)`)
 				}
 				let parsedResult = await this.buildParsedResultFromMarkdownAttachment(task.sourceAttachment, {
 					includeImages: settings.noteIncludeImages
 				})
 
 				if (typeof itemProgress.setText === "function") {
-					itemProgress.setText(`${title}（保存笔记）`)
+					itemProgress.setText(`${title} (saving note)`)
 				}
 				await this.saveResultAsNote({
 					attachment: task.sourceAttachment,
@@ -2682,14 +2682,14 @@ ZoteroMineru = {
 				})
 
 				if (typeof itemProgress.setText === "function") {
-					itemProgress.setText(`${title}（完成）`)
+					itemProgress.setText(`${title} (done)`)
 				}
 				itemProgress.setProgress(100)
 				successes++
 			}
 			catch (e) {
 				if (typeof itemProgress.setText === "function") {
-					itemProgress.setText(`${title}（失败）`)
+					itemProgress.setText(`${title} (failed)`)
 				}
 				itemProgress.setError()
 				failures.push(`${title}: ${e.message || e}`)
@@ -2697,24 +2697,24 @@ ZoteroMineru = {
 			}
 		}
 
-		progress.addDescription(`完成 ${successes}/${tasks.length}`)
+		progress.addDescription(`Done ${successes}/${tasks.length}`)
 		progress.startCloseTimer(5000)
 
 		if (failures.length) {
-			this.showAlert(window, "MinerU 转笔记部分失败", failures.slice(0, 10).join("\n"))
+			this.showAlert(window, "MinerU markdown-to-note: some items failed", failures.slice(0, 10).join("\n"))
 		}
 	},
 
 	async handleSummaryCommand({ window = null, selectedItems = null } = {}) {
 		let llmSettings = this.getLLMSettings();
 		if (!llmSettings.apiBaseURL || !llmSettings.apiKey || !llmSettings.model) {
-			this.showAlert(window, "MinerU", "请先在设置中填写完整的 LLM API 信息（Base URL、API Key、模型名称）。");
+			this.showAlert(window, "MinerU", "Please fill in the complete LLM API info (Base URL, API Key, model name) in settings first.");
 			return;
 		}
 		try {
 			llmSettings.summaryRequestParams = this.parseOptionalJSONObject(
 				llmSettings.summaryRequestJSON,
-				"总结额外 JSON 参数"
+				"Summary extra JSON params"
 			);
 		} catch (e) {
 			this.showAlert(window, "MinerU", e.message || String(e));
@@ -2726,31 +2726,31 @@ ZoteroMineru = {
 			|| [];
 		let tasks = this.collectSummaryTasks(items);
 		if (!tasks.length) {
-			this.showAlert(window, "MinerU", "当前选择的条目没有带 #MinerU-Parse 标签的解析结果，请先使用 MinerU 解析 PDF。");
+			this.showAlert(window, "MinerU", "Selected items have no parse result tagged #MinerU-Parse. Please parse the PDF with MinerU first.");
 			return;
 		}
 
 		let progress = new Zotero.ProgressWindow({ closeOnClick: true });
-		progress.changeHeadline("AI 文献总结");
+		progress.changeHeadline("AI Summary");
 		progress.show();
 
 		let successes = 0;
 		let failures = [];
 
 		for (let task of tasks) {
-			let title = task.parentItem.getField("title") || "未知文献";
+			let title = task.parentItem.getField("title") || "Untitled item";
 			let itemProgress = new progress.ItemProgress(
 				"chrome://zotero/skin/treeitem-note.png",
 				title
 			);
 			try {
 				if (typeof itemProgress.setText === "function") {
-					itemProgress.setText(`${title}（提取文本）`);
+					itemProgress.setText(`${title} (extracting text)`);
 				}
 				let plainText = ""
 				if (task.mineruSourceType === "attachment") {
 					let filePath = await task.mineruSource.getFilePath()
-					if (!filePath) throw new Error("MinerU Markdown 附件文件不存在")
+					if (!filePath) throw new Error("MinerU Markdown attachment file does not exist")
 					let fileBytes = await IOUtils.read(filePath)
 					plainText = new TextDecoder("utf-8").decode(fileBytes)
 				} else {
@@ -2761,16 +2761,16 @@ ZoteroMineru = {
 					plainText = plainText.slice(0, 60000);
 				}
 				if (!plainText.trim()) {
-					throw new Error("MinerU 解析内容为空");
+					throw new Error("MinerU parse content is empty");
 				}
 
 				if (typeof itemProgress.setText === "function") {
-					itemProgress.setText(`${title}（调用 LLM）`);
+					itemProgress.setText(`${title} (calling LLM)`);
 				}
 				let summary = await this.callLLMForSummary(plainText, llmSettings, llmSettings.summaryLanguage);
 
 				if (typeof itemProgress.setText === "function") {
-					itemProgress.setText(`${title}（保存笔记）`);
+					itemProgress.setText(`${title} (saving note)`);
 				}
 				await this.saveSummaryAsNote({
 					parentItem: task.parentItem,
@@ -2778,13 +2778,13 @@ ZoteroMineru = {
 				});
 
 				if (typeof itemProgress.setText === "function") {
-					itemProgress.setText(`${title}（完成）`);
+					itemProgress.setText(`${title} (done)`);
 				}
 				itemProgress.setProgress(100);
 				successes++;
 			} catch (e) {
 				if (typeof itemProgress.setText === "function") {
-					itemProgress.setText(`${title}（失败）`);
+					itemProgress.setText(`${title} (failed)`);
 				}
 				itemProgress.setError();
 				failures.push(`${title}: ${e.message || e}`);
@@ -2792,37 +2792,37 @@ ZoteroMineru = {
 			}
 		}
 
-		progress.addDescription(`完成 ${successes}/${tasks.length}`);
+		progress.addDescription(`Done ${successes}/${tasks.length}`);
 		progress.startCloseTimer(5000);
 
 		if (failures.length) {
-			this.showAlert(window, "AI 总结部分失败", failures.slice(0, 10).join("\n"));
+			this.showAlert(window, "AI summary: some items failed", failures.slice(0, 10).join("\n"));
 		}
 	},
 
 	async callLLMForSummary(plainText, llmSettings, language) {
 		let url = `${llmSettings.apiBaseURL}/chat/completions`;
-		language = language || "中文";
+		language = language || "English";
 		let systemPrompt
-		if (language === "中文") {
-			systemPrompt = `你是一位学术研究助手。请根据用户提供的论文内容，用中文撰写一份结构化的学术总结。总结应包含以下几个部分：
+		if (language === "English") {
+			systemPrompt = `You are an academic research assistant. Based on the paper content provided by the user, write a structured academic summary in English. The summary should include the following sections:
 
-## 研究背景
-简要介绍研究领域和背景。
+## Background
+Briefly introduce the research field and background.
 
-## 研究目的
-明确说明本研究要解决的问题或目标。
+## Objectives
+Clearly state the problem or goals of this research.
 
-## 研究方法
-概述使用的主要方法和技术路线。
+## Methods
+Outline the main methods and technical approach.
 
-## 主要发现
-列出关键的研究结果和发现。
+## Key Findings
+List the key research results and findings.
 
-## 结论与意义
-总结研究的主要结论及其学术或实际意义。
+## Conclusions and Significance
+Summarize the main conclusions and their academic or practical significance.
 
-请确保总结准确、简洁，忠实于原文内容，不要添加原文中没有的信息。`;
+Ensure the summary is accurate, concise, and faithful to the original content. Do not add information not present in the original text.`;
 		} else {
 			systemPrompt = `You are an academic research assistant. Based on the paper content provided by the user, write a structured academic summary in ${language}. The summary should include the following sections:
 
@@ -2844,9 +2844,9 @@ Summarize the main conclusions and their academic or practical significance.
 Ensure the summary is accurate, concise, and faithful to the original content. Do not add information not present in the original text. Write entirely in ${language}.`;
 		}
 
-		let userMessage = language === "中文"
-			? `请总结以下论文内容：\n\n${plainText}`
-			: `Please summarize the following paper:\n\n${plainText}`;
+		let userMessage = language === "English"
+			? `Please summarize the following paper:\n\n${plainText}`
+			: `Please summarize the following paper into ${language}:\n\n${plainText}`;
 
 		let payload = {
 			model: llmSettings.model,
@@ -2874,22 +2874,22 @@ Ensure the summary is accurate, concise, and faithful to the original content. D
 
 			if (!response.ok) {
 				let errText = await response.text();
-				throw new Error(`LLM API 请求失败 ${response.status}: ${errText.slice(0, 500)}`);
+				throw new Error(`LLM API request failed ${response.status}: ${errText.slice(0, 500)}`);
 			}
 
 			let result = await response.json();
 			let content = result?.choices?.[0]?.message?.content;
 			if (!content || !content.trim()) {
-				throw new Error("LLM 返回内容为空");
+				throw new Error("LLM returned empty content");
 			}
 			return content.trim();
 		};
 
-		return await this.withTimeout(doFetch, 120000, "LLM API 请求");
+		return await this.withTimeout(doFetch, 120000, "LLM API request");
 	},
 
 	async saveSummaryAsNote({ parentItem, summaryText }) {
-		let parentTitle = parentItem.getField("title") || "未知文献";
+		let parentTitle = parentItem.getField("title") || "Untitled item";
 		let noteTitle = `AI Summary ${parentTitle}`;
 		let summaryHTML = this.convertMarkdownToBasicHTML(summaryText);
 		let noteHTML = this.ensureNoteTitleInHTML(summaryHTML, noteTitle);
@@ -2950,13 +2950,13 @@ Ensure the summary is accurate, concise, and faithful to the original content. D
 	async handleTranslateCommand({ window = null, selectedItems = null } = {}) {
 		let llmSettings = this.getLLMSettings()
 		if (!llmSettings.apiBaseURL || !llmSettings.apiKey || !llmSettings.model) {
-			this.showAlert(window, "MinerU", "请先在设置中填写完整的 LLM API 信息（Base URL、API Key、模型名称）。")
+			this.showAlert(window, "MinerU", "Please fill in the complete LLM API info (Base URL, API Key, model name) in settings first.")
 			return
 		}
 		try {
 			llmSettings.translateRequestParams = this.parseOptionalJSONObject(
 				llmSettings.translateRequestJSON,
-				"翻译额外 JSON 参数"
+				"Translation extra JSON params"
 			)
 		} catch (e) {
 			this.showAlert(window, "MinerU", e.message || String(e))
@@ -2968,38 +2968,38 @@ Ensure the summary is accurate, concise, and faithful to the original content. D
 			|| []
 		let tasks = this.collectTranslateTasks(items)
 		if (!tasks.length) {
-			this.showAlert(window, "MinerU", "当前选择的条目没有可翻译的 MinerU 解析结果，请先使用 MinerU 解析 PDF。\n（已有翻译结果的条目会被跳过）")
+			this.showAlert(window, "MinerU", "Selected items have no MinerU parse result to translate. Please parse the PDF with MinerU first.\n(Items already having a translation are skipped.)")
 			return
 		}
 
-		let language = llmSettings.translateLanguage || "中文"
+		let language = llmSettings.translateLanguage || "English"
 		let chunkSize = llmSettings.translateChunkSize || 20000
 		let translateConcurrency = llmSettings.translateConcurrency || 3
 		let translateRetryCount = llmSettings.translateRetryCount || 2
 
 		let progress = new Zotero.ProgressWindow({ closeOnClick: true })
-		progress.changeHeadline(`AI 文献翻译 → ${language}`)
+		progress.changeHeadline(`AI Translation → ${language}`)
 		progress.show()
 
 		let successes = 0
 		let failures = []
 
 		for (let task of tasks) {
-			let title = task.parentItem.getField("title") || "未知文献"
+			let title = task.parentItem.getField("title") || "Untitled item"
 			let itemProgress = new progress.ItemProgress(
 				"chrome://zotero/skin/treeitem-note.png",
 				title
 			)
 			try {
 				if (typeof itemProgress.setText === "function") {
-					itemProgress.setText(`${title}（提取文本）`)
+					itemProgress.setText(`${title} (extracting text)`)
 				}
 				let filePath = await task.mineruSource.getFilePath()
-				if (!filePath) throw new Error("MinerU Markdown 附件文件不存在")
+				if (!filePath) throw new Error("MinerU Markdown attachment file does not exist")
 				let fileBytes = await IOUtils.read(filePath)
 				let fullText = new TextDecoder("utf-8").decode(fileBytes)
 				if (!fullText.trim()) {
-					throw new Error("MinerU 解析内容为空")
+					throw new Error("MinerU parse content is empty")
 				}
 
 				// Split into chunks for translation
@@ -3010,9 +3010,9 @@ Ensure the summary is accurate, concise, and faithful to the original content. D
 				let retryRound = 0
 
 				while (pendingChunkIndexes.length) {
-					let batchLabel = retryRound ? `重试第 ${retryRound} 轮` : "翻译"
+					let batchLabel = retryRound ? `Retry round ${retryRound}` : "Translating"
 					if (typeof itemProgress.setText === "function") {
-						itemProgress.setText(`${title}（${batchLabel} 0/${pendingChunkIndexes.length}，并发 ${activeConcurrency}）`)
+						itemProgress.setText(`${title} (${batchLabel} 0/${pendingChunkIndexes.length}, concurrency ${activeConcurrency})`)
 					}
 					let batchResult = await this.translateChunksWithConcurrency({
 						chunks,
@@ -3023,9 +3023,9 @@ Ensure the summary is accurate, concise, and faithful to the original content. D
 							return this.callLLMForTranslation(chunk, language, llmSettings, chunkIndex + 1, totalChunks)
 						},
 						onProgress: ({ completed, total }) => {
-							let progressLabel = retryRound ? `重试第 ${retryRound} 轮` : "翻译"
+							let progressLabel = retryRound ? `Retry round ${retryRound}` : "Translating"
 							if (typeof itemProgress.setText === "function") {
-								itemProgress.setText(`${title}（${progressLabel} ${completed}/${total}，并发 ${activeConcurrency}）`)
+								itemProgress.setText(`${title} (${progressLabel} ${completed}/${total}, concurrency ${activeConcurrency})`)
 							}
 						}
 					})
@@ -3039,7 +3039,7 @@ Ensure the summary is accurate, concise, and faithful to the original content. D
 					}
 
 					if (typeof itemProgress.setText === "function") {
-						itemProgress.setText(`${title}（等待确认重试失败段落）`)
+						itemProgress.setText(`${title} (waiting for failed-chunk retry confirmation)`)
 					}
 					retryRound++
 					let shouldRetryFailures = this.confirmRetryFailedChunks(window, {
@@ -3049,28 +3049,28 @@ Ensure the summary is accurate, concise, and faithful to the original content. D
 						autoRetryCount: translateRetryCount
 					})
 					if (!shouldRetryFailures) {
-						throw new Error(this.buildFailedChunkSummary(batchResult.failures, 10) || "部分段落翻译失败")
+						throw new Error(this.buildFailedChunkSummary(batchResult.failures, 10) || "Some chunks failed to translate")
 					}
 					pendingChunkIndexes = batchResult.failures.map((failure) => failure.chunkIndex)
 					if (typeof itemProgress.setText === "function") {
-						itemProgress.setText(`${title}（准备重试失败段落 ${pendingChunkIndexes.length} 段）`)
+						itemProgress.setText(`${title} (preparing to retry ${pendingChunkIndexes.length} failed chunks)`)
 					}
 				}
 
 				if (translatedParts.some((part) => typeof part !== "string" || !part.trim())) {
 					let missingChunks = translatedParts
-						.map((part, index) => (typeof part === "string" && part.trim()) ? null : `第 ${index + 1}/${translatedParts.length} 段`)
+						.map((part, index) => (typeof part === "string" && part.trim()) ? null : `chunk ${index + 1}/${translatedParts.length}`)
 						.filter(Boolean)
-					throw new Error(`仍有未完成段落，无法合成结果：${missingChunks.slice(0, 10).join("，")}`)
+					throw new Error(`Cannot assemble result; still-pending chunks: ${missingChunks.slice(0, 10).join(", ")}`)
 				}
 
 				if (typeof itemProgress.setText === "function") {
-					itemProgress.setText(`${title}（合成翻译结果）`)
+					itemProgress.setText(`${title} (assembling translation)`)
 				}
 				let translatedText = translatedParts.join("\n\n")
 
 				if (typeof itemProgress.setText === "function") {
-					itemProgress.setText(`${title}（保存附件）`)
+					itemProgress.setText(`${title} (saving attachment)`)
 				}
 				await this.saveTranslationAsMarkdownAttachment({
 					parentItem: task.parentItem,
@@ -3080,28 +3080,28 @@ Ensure the summary is accurate, concise, and faithful to the original content. D
 				})
 
 				if (typeof itemProgress.setText === "function") {
-					itemProgress.setText(`${title}（完成）`)
+					itemProgress.setText(`${title} (done)`)
 				}
 				itemProgress.setProgress(100)
 				successes++
 			} catch (e) {
 				if (typeof itemProgress.setText === "function") {
-					itemProgress.setText(`${title}（${this.isTimeoutError(e) ? "超时" : "失败"}）`)
+					itemProgress.setText(`${title} (${this.isTimeoutError(e) ? "timed out" : "failed"})`)
 				}
 				itemProgress.setError()
-				failures.push(`${title}: ${this.formatUserFacingError(e, "翻译失败")}`)
+				failures.push(`${title}: ${this.formatUserFacingError(e, "Translation failed")}`)
 				Zotero.logError(e)
 			}
 		}
 
-		progress.addDescription(`完成 ${successes}/${tasks.length}`)
+		progress.addDescription(`Done ${successes}/${tasks.length}`)
 		if (failures.length) {
-			progress.addDescription(`失败 ${failures.length}/${tasks.length}`)
+			progress.addDescription(`Failed ${failures.length}/${tasks.length}`)
 		}
 		progress.startCloseTimer(5000)
 
 		if (failures.length) {
-			this.showAlert(window, "AI 翻译部分失败", failures.slice(0, 10).join("\n"))
+			this.showAlert(window, "AI translation: some items failed", failures.slice(0, 10).join("\n"))
 		}
 	},
 
@@ -3178,7 +3178,7 @@ Ensure the summary is accurate, concise, and faithful to the original content. D
 			chunkIndex,
 			totalChunks,
 			attempts: maxAttempts,
-			error: lastError || new Error("翻译失败")
+			error: lastError || new Error("Translation failed")
 		}
 	},
 
@@ -3275,18 +3275,18 @@ Rules:
 
 			if (!response.ok) {
 				let errText = await response.text()
-				throw new Error(`LLM API 请求失败 ${response.status}: ${errText.slice(0, 500)}`)
+				throw new Error(`LLM API request failed ${response.status}: ${errText.slice(0, 500)}`)
 			}
 
 			let result = await response.json()
 			let content = result?.choices?.[0]?.message?.content
 			if (!content || !content.trim()) {
-				throw new Error("LLM 返回内容为空")
+				throw new Error("LLM returned empty content")
 			}
 			return content.trim()
 		}
 
-		return await this.withTimeout(doFetch, 180000, "LLM 翻译请求")
+		return await this.withTimeout(doFetch, 180000, "LLM translation request")
 	},
 
 	async saveTranslationAsMarkdownAttachment({ parentItem, sourceAttachment, translatedText, language }) {
@@ -3316,7 +3316,7 @@ Rules:
 			mdAttachment.addTag("#MinerU-Translation", 0)
 			await mdAttachment.saveTx()
 
-			this.log(`翻译附件已保存: ${mdFileName} (图片链接已指向源附件 ${sourceAttachment?.key || "unknown"})`)
+			this.log(`Translation attachment saved: ${mdFileName} (image links point at source attachment ${sourceAttachment?.key || "unknown"})`)
 		}
 		finally {
 			await IOUtils.remove(mdTempPath).catch(() => {})
